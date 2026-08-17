@@ -5,8 +5,8 @@
 Status legend: ⬜ not started · 🔶 in progress · ✅ done
 
 ## Foundation
-- ✅ Task 1 — Project scaffold
-- ✅ Task 2 — Testing infrastructure
+- ✅ Task 1 — Project scaffold — `claude/dimensional-exploration-app-uj20jy` @ `cc3e7d9`, merged to default
+- ✅ Task 2 — Testing infrastructure — `claude/dimensional-exploration-app-uj20jy` @ `cc3e7d9`, merged to default
 - ⬜ Task 3 — Global state store
 - ⬜ Task 4 — Validation math
 - ⬜ Task 5 — Scene shell + stage router
