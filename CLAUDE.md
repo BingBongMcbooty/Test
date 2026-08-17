@@ -31,6 +31,7 @@ An interactive web app that teaches spatial dimensions experientially — line �
 - Update `PROGRESS.md` — check off the task, note anything that deviated from the plan — before ending the session.
 - If a task isn't converging, stop and split it into two sessions rather than pushing through a single long one. PLAN.md already flags Tasks 9 and 12 as the likeliest candidates for this.
 - Trust the codebase and `PROGRESS.md` over memory of past sessions. A fresh session has no memory of earlier ones — verify claims ("this is already working") by actually running things, not by assuming a prior session's notes were accurate.
+- Before yielding for the next prompt, give a one-line context-window check-in: flag it if the conversation is getting long, if earlier context appears to have been auto-summarized, or roughly how many turns/tasks deep the session is. There's no tool access to an exact token count, so keep this qualitative — don't state a precise number or percentage.
 
 ## For Henry: how these files get used
 
