@@ -17,8 +17,9 @@ This is a brand-new repo — completely empty, no scaffolding of any kind — so
 | Testing | Vitest for math/logic, Playwright for real-browser visual verification |
 | Arrow interaction | Click-drag in 3D space, live-rendered arrow, raycast onto a camera-facing plane |
 | Stage 3 behavior | Free, unlocked attempts; app shows *why* each attempt fails (axis decomposition), no artificial lock |
-| Stage 4 visualization | Cross-section slicing (4D tesseract sliced by a hyperplane, animated via 4D rotation) |
-| Tone | Minimalist, philosophical — dark background, sparse wireframes, few well-chosen lines of text |
+| Cube rendering (Stage 3 on) | Solid, lit faces (`MeshStandardMaterial` + a directional light) with a thin wireframe edge overlay, translucent fill rather than fully opaque — depth reads without hiding the far side of the shape or a mid-drag arrow from any orbit angle. Stages 1–2 stay pure line geometry; a line/plane has no face to shade. |
+| Stage 4 visualization | Both, player-driven rather than autoplayed: cross-section slicing (4D tesseract sliced by a hyperplane, default view) and 4D→3D projection (flattened "shadow" view), toggled, both computed from one shared rotation/offset state that the player controls by dragging — see Task 12/13. |
+| Tone | Minimalist, philosophical — dark background, sparse geometry (wireframe for line/plane, solid-but-translucent lit faces with wireframe edges from the cube stage on), few well-chosen lines of text |
 | Platform | Desktop only — mouse + keyboard, no touch |
 | Persistence | None — single session, refresh resets to Stage 1 |
 | Scope | Ends with a brief "this repeats at every dimension" closing beat — no interactive 5D stage |
@@ -31,7 +32,7 @@ src/
   state/stageConfig.ts     # per-stage occupied axes + prompt copy
   math/validation.ts        # evaluateAttempt(dragVector, occupiedAxes) — the ONE function behind all 3 stages
   math/dragPlane.ts          # builds a camera-facing plane at the drag anchor; raycasts pointer onto it
-  math/fourd.ts               # tesseract vertices/faces, 4D rotation, hyperplane slicing
+  math/fourd.ts               # tesseract vertices/faces, 4D rotation, hyperplane slicing + 4D→3D projection
   scene/Experience.tsx          # Canvas, CameraControls, stage router
   scene/ArrowDrag.tsx            # pointer-down/move/up: hit-test, mode switch, live drag feed
   scene/LiveArrow.tsx             # shaft+cone arrow mesh between two points
@@ -42,6 +43,8 @@ src/
 **Why one drag mechanic serves all three stages:** each stage just declares which axes are already "occupied" (line → X; plane → X,Y; cube → X,Y,Z). Validation projects the drawn vector onto the occupied subspace and checks what's left over. For the cube, the occupied subspace *is* all of 3D space, so the leftover is always exactly zero — Stage 3 fails not because of a special case, but because there's genuinely nowhere left to point. That's what makes the surprise real instead of scripted.
 
 **Why a camera-facing plane for dragging:** a mouse drag is inherently 2D. Anchoring a plane at the click point, facing the camera, means dragging right on screen moves the arrow right — no learning curve — and it's non-degenerate from nearly any orbit angle (unlike a fixed world-space plane, which goes edge-on and unusable from many angles).
+
+**Why Stage 4 shows the tesseract two ways:** a 4D→3D *projection* flattens the whole object at once, the same relationship a cube's 2D shadow has to the cube — you see everything, just compressed. A hyperplane *slice* shows only whatever part of the object currently intersects your 3D "plane of existence," the same relationship a sphere passing through Flatland has to a 2D creature living there — you never see the whole thing, only a partial, changing piece of it. Both are real techniques used in the wild, and they teach slightly different lessons, so rather than pick one, Stage 4 keeps a single piece of 4D state (rotation angles, slice `w0`) that the player drives directly by dragging — reusing the exact same drag-plane machinery from Stages 1–3 — with a toggle to switch which lens they're looking at that state through.
 
 **Note on one deviation from what you described:** you mentioned rotating "around the object" (OrbitControls-style). This guide recommends drei's `CameraControls` instead of raw `OrbitControls` — same free 360° drag-to-orbit feel, but it also gives animated camera transitions between stages for free, avoiding hand-written tweening code. Behaviorally it's a superset; revisit if you'd rather keep it to literal `OrbitControls`.
 
@@ -79,7 +82,7 @@ Deliverable: `math/validation.ts` — `projectOntoComplement`, `evaluateAttempt`
 Verify: `npm test`, with hand-computed expected values noted in test comments.
 
 **Task 5 — Scene shell + stage router**
-Deliverable: `scene/Experience.tsx` — dark background, `CameraControls`, a router that renders the right wireframe primitive (line/plane/cube) per `store.stage`, camera reframing per stage (no animation yet), basic `HUD.tsx` showing stage name + placeholder prompt.
+Deliverable: `scene/Experience.tsx` — dark background, `CameraControls`, a router that renders the right primitive per `store.stage`: line and plane stay pure wireframe (no face to shade), but the cube gets solid, lit faces (`MeshStandardMaterial` + a directional light) with a thin wireframe edge overlay, translucent fill so depth reads without occluding the far side of the shape or a mid-drag arrow from any orbit angle. Camera reframing per stage (no animation yet), basic `HUD.tsx` showing stage name + placeholder prompt.
 Verify: Playwright — load the page, see Stage 1's line; use the Task 3 debug buttons to cycle stages, confirm geometry swaps and camera reframes; screenshot each stage.
 
 **Task 6 — Orbit interaction tuning**
@@ -98,7 +101,7 @@ Verify: toggle debug props, confirm it renders/updates and points the right way;
 
 **Task 9 — Pointer/drag controller**
 Deliverable: `scene/ArrowDrag.tsx` — pointer-down hit-tests the current stage's object (give the line/plane an invisible, slightly inflated collider so they're clickable), enters draw mode and disables `CameraControls` for the drag, feeds `LiveArrow` from Task 7's plane math on pointer-move, restores orbit on pointer-up, discards too-short drags. No pass/fail logic yet.
-Verify: Playwright — simulate a drag starting on the object (arrow appears mid-drag, screenshot) vs. starting off the object (camera orbits instead).
+Verify: Playwright — simulate a drag starting on the object (arrow appears mid-drag, screenshot) vs. starting off the object (camera orbits instead); on the cube stage, confirm the arrow still reads clearly against the solid translucent faces from a couple of orbit angles.
 *This is likely the fiddliest task in the build. If it's not converging in one session, split "hit-test + mode switching" from "live arrow feed" into two sessions rather than pushing through.*
 
 **Task 10 — Validation wiring for Stages 1 & 2**
@@ -114,16 +117,18 @@ Verify: Playwright — a couple of cube drags stay on "cube" and show plausible 
 **— New session recommended here. The interactive puzzle is complete; Stage 4 is a self-contained animation subsystem with its own math. —**
 
 **Task 12 — 4D math core**
-Deliverable: `math/fourd.ts` — tesseract vertex generation (16 vertices), face generation via the axis-pair method (24 faces, no hardcoded table needed), `rotateXW`/`rotateYZ`, hyperplane slicing per face (no convex-hull library required — slice each square face's 4 edges directly). Thorough Vitest coverage: correct vertex/face counts, the known case (axis-aligned tesseract sliced at w=0 yields exactly a cube's 12 edges), and a sanity sweep across rotation angles with no NaNs.
-Verify: `npm test`. This is the highest-risk math in the app — get it fully green before touching rendering.
-*Fallback if this stalls: a 4D hypersphere sliced by w=w0 (radius = √(R²−w0²)) is simpler, still mathematically real, and matches the classic "sphere passing through Flatland looks like a growing-then-shrinking circle" analogy. Don't burn a whole extra session forcing the tesseract version — swap to the fallback and move on.*
+Deliverable: `math/fourd.ts` — tesseract vertex generation (16 vertices), face generation via the axis-pair method (24 faces, no hardcoded table needed), `rotateXW`/`rotateYZ`. Two rendering paths off the same rotated vertices: (a) hyperplane slicing per face (no convex-hull library required — slice each square face's 4 edges directly) and (b) `projectTo3D`, a perspective 4D→3D projection ("drop w" with distance-based scaling, the same idea as the classic rotating-tesseract animation) that flattens the whole shape instead of slicing it. Thorough Vitest coverage: correct vertex/face counts; the known slicing case (axis-aligned tesseract sliced at w=0 yields exactly a cube's 12 edges); a sanity sweep across rotation angles with no NaNs, for both the slicing and projection paths.
+Verify: `npm test`. This is the highest-risk math in the app, and it's now two techniques instead of one — get both fully green before touching rendering. If it's not converging, do the slicing half and the projection half as two separate sessions rather than forcing both into one.
+*Fallback if slicing stalls: a 4D hypersphere sliced by w=w0 (radius = √(R²−w0²)) is simpler, still mathematically real, and matches the classic "sphere passing through Flatland looks like a growing-then-shrinking circle" analogy.*
+*Fallback if the perspective projection stalls: a plain orthographic projection (just drop the w coordinate, no distance scaling) is less visually dramatic but trivial to implement and still mathematically real — fine for Task 13 to build against. Don't burn a whole extra session chasing the perspective version — swap to whichever fallback you need and move on.*
 
 **Task 13 — Reveal scene**
-Deliverable: `scene/stages/RevealStage.tsx` — renders the cross-section as `THREE.LineSegments`, driven by a continuously-advancing rotation angle in `useFrame`, camera transition into the stage, short caption line.
-Verify: Playwright screenshots a second or two apart, confirming the wireframe topology genuinely changes over time.
+Deliverable: `scene/stages/RevealStage.tsx` — renders the tesseract as `THREE.LineSegments` in one of two views, `revealView: 'slice' | 'projection'` (add to the Task 3 store), both computed from one shared piece of 4D state (rotation angles, slice `w0`). Instead of autoplaying, the player drives that state directly: reuse `math/dragPlane.ts`'s camera-facing-plane raycast so a horizontal drag maps to 4D rotation and a depth/vertical drag maps to the slice offset — the same drag mechanic as Stages 1–3, repurposed rather than re-invented. A toggle button swaps `revealView` without resetting the underlying rotation/offset. Camera transition into the stage, short caption line.
+Verify: Playwright — drag at a few points and confirm the rendered wireframe topology changes in response to input (not on a timer); toggle the view and confirm slice/projection render the same underlying state two different ways; screenshot each view a beat apart to show it's responsive, not a canned loop.
+*This task grew with the addition of interactivity and the view toggle — if it's not converging in one session alongside Task 12, treat "get slicing and projection both rendering, non-interactively" and "wire up drag control + the toggle" as two separate sessions.*
 
 **Task 14 — Closing beat + restart**
-Deliverable: after Stage 4 runs for a set duration (or on a "continue" click), fade in the closing line (something like "A 4-dimensional being trying to point to a 5th dimension hits the exact same wall.") and a restart button resetting to Stage 1.
+Deliverable: after the player has explored Stage 4 for a bit (a rotation/drag-count threshold, or on a "continue" click), fade in the closing line (something like "A 4-dimensional being trying to point to a 5th dimension hits the exact same wall.") and a restart button resetting to Stage 1.
 Verify: Playwright confirms the text appears and restart returns cleanly to Stage 1.
 
 **— New session recommended here. The core experience is complete; what's left is regression-proofing and polish. —**
@@ -148,6 +153,8 @@ Verify: `npm run build && npm run preview` matches dev behavior; deployed URL lo
 - **Axis convention** (line=X, plane=XY, cube=XYZ): arbitrary but touches many files once set — fine to leave as-is, but this is the one thing costly to change later, so a quick sanity check before Task 5 is worth it.
 - **Attempts before Stage 4** (Task 11): defaulted to 3.
 - **"Give up" button visibility** (Task 11): defaulted to appearing after the first failed attempt, to encourage one genuine try first.
+- **Cube face translucency** (Task 5): opacity needs to be low enough that the far side of the cube and a mid-drag arrow stay legible through it, high enough to actually read as "solid" rather than wireframe-with-a-tint — tune by eye during Task 5/9.
+- **Drag-to-rotation and drag-to-slice-offset sensitivity** (Task 13): how much 4D rotation angle / `w0` offset a given pixel-drag distance produces — no default chosen yet, tune during Task 13's own playtest.
 
 ## Verification philosophy throughout
 

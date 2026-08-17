@@ -1,6 +1,6 @@
 # Dimensions
 
-An interactive web app that teaches spatial dimensions experientially — line → plane → cube → the wall at 4D → a demonstration of the 4th dimension via cross-sections. See `PLAN.md` for the full design rationale and task-by-task build guide.
+An interactive web app that teaches spatial dimensions experientially — line → plane → cube → the wall at 4D → a player-driven demonstration of the 4th dimension via cross-sections and projection. See `PLAN.md` for the full design rationale and task-by-task build guide.
 
 ## Before doing anything
 
@@ -29,7 +29,7 @@ An interactive web app that teaches spatial dimensions experientially — line �
 - This is a visual, interactive app — passing tests are necessary but never sufficient. Every task ends by actually looking at the result in a browser (a Playwright screenshot, or a manual look via `npm run dev`).
 - Commit at the end of each completed task, referencing the task number, e.g. `Task 4: add validation math`.
 - Update `PROGRESS.md` — check off the task, note anything that deviated from the plan — before ending the session.
-- If a task isn't converging, stop and split it into two sessions rather than pushing through a single long one. PLAN.md already flags Tasks 9 and 12 as the likeliest candidates for this.
+- If a task isn't converging, stop and split it into two sessions rather than pushing through a single long one. PLAN.md already flags Tasks 9, 12, and 13 as the likeliest candidates for this.
 - Trust the codebase and `PROGRESS.md` over memory of past sessions. A fresh session has no memory of earlier ones — verify claims ("this is already working") by actually running things, not by assuming a prior session's notes were accurate.
 - Before yielding for the next prompt, give a one-line context-window check-in: flag it if the conversation is getting long, if earlier context appears to have been auto-summarized, or roughly how many turns/tasks deep the session is. There's no tool access to an exact token count, so keep this qualitative — don't state a precise number or percentage.
 
