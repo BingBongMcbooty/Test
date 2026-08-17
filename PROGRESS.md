@@ -1,11 +1,11 @@
 # Progress
 
-**Next up:** Task 1 — Project scaffold
+**Next up:** Task 2 — Testing infrastructure
 
 Status legend: ⬜ not started · 🔶 in progress · ✅ done
 
 ## Foundation
-- ⬜ Task 1 — Project scaffold
+- ✅ Task 1 — Project scaffold
 - ⬜ Task 2 — Testing infrastructure
 - ⬜ Task 3 — Global state store
 - ⬜ Task 4 — Validation math
@@ -34,3 +34,9 @@ Status legend: ⬜ not started · 🔶 in progress · ✅ done
 ## Notes / deviations from PLAN.md
 
 _(Add anything here that changed from the original plan as you go — tuned parameters, fallback approaches taken, anything a future session should know that isn't in PLAN.md.)_
+
+- `npm create vite@latest .` refuses to scaffold into a non-empty directory (this repo has CLAUDE.md/PLAN.md/PROGRESS.md) even with piped input; scaffolded into a scratch dir and copied the generated files in instead.
+- The current `create-vite` react-ts template defaults to oxlint instead of ESLint. Removed oxlint/`.oxlintrc.json` and set up ESLint 10 (flat config) + `typescript-eslint` + `eslint-plugin-react-hooks`/`eslint-plugin-react-refresh` + Prettier (with `eslint-config-prettier` to disable stylistic overlap), per PLAN.md's "ESLint/Prettier" requirement. Note: `eslint-plugin-react-hooks`'s flat-config export for `recommended-latest` lives under `reactHooks.configs.flat['recommended-latest']`, not `reactHooks.configs['recommended-latest']` (that one is eslintrc-style and throws under flat config).
+- Test cube uses `EdgesGeometry`/`lineSegments` rather than `meshBasicMaterial wireframe` on a `boxGeometry` — the latter draws the triangulation diagonals across each face, which looks wrong for the "sparse wireframe" tone; `EdgesGeometry` gives the expected clean 12-edge cube.
+- Removed the template's default assets (`src/assets/*`, `public/icons.svg`) and the "Get started" landing page markup — replaced with a minimal dark `<Canvas>` shell directly in `App.tsx`. `scene/Experience.tsx` (Canvas + CameraControls + stage router) is still Task 5's job; for now `src/{state,math,scene,ui}` are just empty folders (`.gitkeep`) per the architecture skeleton.
+- Verified via Playwright (headless Chromium at `/opt/pw-browsers`, launched directly since the `playwright` npm package isn't installed as a project dependency yet — that arrives with Task 2's e2e setup): page loads with zero console errors, two screenshots ~1.2s apart show the cube has visibly rotated.
