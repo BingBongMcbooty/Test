@@ -1,6 +1,6 @@
 # Progress
 
-**Next up:** Task 5 — Scene shell + stage router
+**Next up:** Task 6 — Orbit interaction tuning
 
 Status legend: ⬜ not started · 🔶 in progress · ✅ done
 
@@ -9,7 +9,7 @@ Status legend: ⬜ not started · 🔶 in progress · ✅ done
 - ✅ Task 2 — Testing infrastructure — `claude/dimensional-exploration-app-uj20jy` @ `cc3e7d9`, merged to default
 - ✅ Task 3 — Global state store — `claude/task-3-baerqo` @ `ca95a8c`, merged to default
 - ✅ Task 4 — Validation math — `claude/task-4-yi7axu` @ `3dad0cd`, merged to default
-- ⬜ Task 5 — Scene shell + stage router
+- ✅ Task 5 — Scene shell + stage router — `claude/task-5-lveobi` @ `ab2d3aa`, merged to default
 - ⬜ Task 6 — Orbit interaction tuning
 
 ## Drag interaction *(new session)*
@@ -50,3 +50,8 @@ _(Add anything here that changed from the original plan as you go — tuned para
 - **Task 4:** `projectOntoComplement` doesn't do a general vector projection — occupied axes are always a subset of the standard basis, so it's just zeroing the occupied components. Worth remembering if a future task ever needs projection onto a non-axis-aligned subspace; this function isn't that.
 - **Task 4:** Used `ORTHOGONALITY_THRESHOLD = 0.7` exactly as specified in PLAN.md's tunables table. Test coverage straddles it with a 3-4-5 triangle (ratios 0.8 pass / 0.6 fail) rather than constructing a vector at the exact bit boundary, since an irrational hand-picked boundary vector risks flipping on floating-point rounding — the threshold constant itself is asserted directly instead.
 - **Task 4:** `axisContributions` is computed from the raw drag vector (`|axis| / sum of |axis|`), independent of which axes are occupied — it's the same breakdown regardless of stage, so Stage 3's decomposition feedback and any other stage would see consistent numbers for the same drag.
+- **Task 5:** `scene/stages/{Reveal}Stage.tsx` doesn't exist yet — the router's `switch` falls through to `null` for `'reveal'`/`'closing'`, so cycling to them via the debug buttons shows an empty scene (HUD text still updates correctly) rather than erroring. Tasks 13/14 add the real content; no router change needed then beyond adding the two cases.
+- **Task 5:** Cube face material needed eye-tuning beyond PLAN.md's starting guess — first pass (`opacity: 0.28`, `color: #3a3a52`) read as barely-there wireframe-with-a-tint in the screenshot; bumped to `opacity: 0.45`, `color: #5858a0` (a lighter indigo) which clearly reads as solid while the far edges stay visible through the near faces. Worth another look once Task 9 has a mid-drag arrow inside the cube to check it stays legible too.
+- **Task 5:** Camera framing per stage lives in `scene/cameraFraming.ts` as fixed position/target pairs, applied via `CameraControls.setLookAt(..., false)` (`false` = no transition) on stage change — straightforward instant cut for now; Task 10 is where an animated transition would replace the `false`.
+- **Task 5:** Added `ui/DebugStageControls.tsx` (throwaway per Task 3's note) so Playwright — and anyone running `npm run dev` — can cycle stages without the real drag interaction that doesn't land until Tasks 7-10. It renders one button per `STAGE_ORDER` entry with `data-testid="debug-stage-{stage}"`. Delete this component once Task 10's real stage-advance wiring makes it redundant — don't let it survive into the shipped app.
+- **Task 5:** Verified via Playwright (`e2e/stage-shell.spec.ts`): loads on Stage 1's line, clicks through all five stages, asserts the HUD label updates each time, and screenshots each — reviewed by hand (not just "test passed"), which is what caught the cube material issue above.
