@@ -3,6 +3,7 @@ import { CameraControls, type CameraControlsImpl } from '@react-three/drei'
 import { useEffect, useRef } from 'react'
 import { useDimensionsStore } from '../state/store'
 import { CAMERA_FRAMING } from './cameraFraming'
+import { LIGHT_RIG } from './materials'
 import { CubeStage } from './stages/CubeStage'
 import { LineStage } from './stages/LineStage'
 import { PlaneStage } from './stages/PlaneStage'
@@ -21,6 +22,33 @@ function StageGeometry() {
     default:
       return null
   }
+}
+
+// Task 7: line/plane keep the flat ambient + one key light from Task 5 (their
+// wireframe/faint fill don't need more), but the cube stage onward gets a proper
+// multi-light setup — a second, cooler fill light joins the key light — matching what
+// `scene/materials.ts`'s hand-rolled shader lighting expects from `LIGHT_RIG`.
+function SceneLights() {
+  const stage = useDimensionsStore((state) => state.stage)
+  const richLighting = stage === 'cube' || stage === 'reveal' || stage === 'closing'
+
+  return (
+    <>
+      <ambientLight color={LIGHT_RIG.ambient.color} intensity={LIGHT_RIG.ambient.intensity} />
+      <directionalLight
+        position={LIGHT_RIG.key.position}
+        color={LIGHT_RIG.key.color}
+        intensity={LIGHT_RIG.key.intensity}
+      />
+      {richLighting && (
+        <directionalLight
+          position={LIGHT_RIG.fill.position}
+          color={LIGHT_RIG.fill.color}
+          intensity={LIGHT_RIG.fill.intensity}
+        />
+      )}
+    </>
+  )
 }
 
 function CameraRig() {
@@ -51,8 +79,7 @@ export function Experience() {
   return (
     <Canvas camera={{ position: CAMERA_FRAMING.line.position, fov: 50 }}>
       <color attach="background" args={['#0a0a0f']} />
-      <ambientLight intensity={0.4} />
-      <directionalLight position={[4, 6, 5]} intensity={1.2} />
+      <SceneLights />
       <StageGeometry />
       <CameraRig />
     </Canvas>

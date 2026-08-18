@@ -1,17 +1,27 @@
 import { useMemo } from 'react'
 import { EdgesGeometry, PlaneGeometry } from 'three'
+import { usePlaneFillMaterial } from '../materials'
 
 /**
- * Stage 2: a wireframe square spanning the occupied X/Y plane. EdgesGeometry (not
- * meshBasicMaterial wireframe) so the diagonal from PlaneGeometry's two triangles is
- * excluded — its coplanar edge has a 0deg angle, under EdgesGeometry's threshold.
+ * Stage 2: the wireframe square from Task 5 stays primary, plus Task 7's transitional
+ * fill — a faint, low-opacity lit/animated surface (see `scene/materials.ts`) sitting
+ * behind the outline as a first hint of the shading/texture detail coming in Stage 3.
+ * EdgesGeometry (not meshBasicMaterial wireframe) still excludes PlaneGeometry's
+ * coplanar triangle diagonal, per Task 5's note.
  */
 export function PlaneStage() {
-  const edges = useMemo(() => new EdgesGeometry(new PlaneGeometry(3, 3)), [])
+  const planeGeometry = useMemo(() => new PlaneGeometry(3, 3), [])
+  const edges = useMemo(() => new EdgesGeometry(planeGeometry), [planeGeometry])
+  const fillMaterial = usePlaneFillMaterial()
 
   return (
-    <lineSegments geometry={edges}>
-      <lineBasicMaterial color="#e5e4e7" />
-    </lineSegments>
+    <group>
+      <mesh geometry={planeGeometry}>
+        <primitive object={fillMaterial} attach="material" />
+      </mesh>
+      <lineSegments geometry={edges}>
+        <lineBasicMaterial color="#e5e4e7" />
+      </lineSegments>
+    </group>
   )
 }
