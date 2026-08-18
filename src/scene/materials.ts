@@ -1,5 +1,6 @@
 import { useMemo } from 'react'
 import { Color, DoubleSide, ShaderMaterial, Timer, Vector3 } from 'three'
+import type { Stage } from '../state/stageConfig'
 
 // Animates `uTime` via the material's own `onBeforeRender` (three.js calls this right
 // before drawing the mesh) rather than a `useFrame` callback mutating the memoized
@@ -223,4 +224,96 @@ export function usePlaneFillMaterial() {
     })
     return withTimeUniform(material)
   }, [])
+}
+
+// Arrow (Task 9): the player's live-drawn arrow needs a hue distinct from the shape it's
+// drawn against (warm gold vs. the shapes' cool indigo/violet), but the same "don't have
+// one fixed look" rule from Task 7 still applies to it. `uRichness` fades the fresnel rim
+// and noise tint in from 0 (line: flat, matching Stage 1's untouched minimalism) through
+// a partial value (plane: a first hint, same idea as the plane fill) up to 1 (cube on:
+// full treatment, matching the cube's own shader). Unlike the stage fills, the arrow
+// stays fully opaque — it needs to read clearly as "your input," not blend into a
+// translucent surface.
+const arrowFragmentShader = /* glsl */ `
+  ${noiseGLSL}
+
+  uniform float uTime;
+  uniform vec3 uBaseColor;
+  uniform vec3 uRimColor;
+  uniform float uRichness;
+  uniform vec3 uAmbientColor;
+  uniform float uAmbientIntensity;
+  uniform vec3 uLight1Dir;
+  uniform vec3 uLight1Color;
+  uniform float uLight1Intensity;
+  uniform vec3 uLight2Dir;
+  uniform vec3 uLight2Color;
+  uniform float uLight2Intensity;
+
+  varying vec3 vNormal;
+  varying vec3 vWorldPosition;
+
+  void main() {
+    vec3 normal = normalize(vNormal);
+    vec3 viewDir = normalize(cameraPosition - vWorldPosition);
+
+    float diff1 = max(dot(normal, uLight1Dir), 0.0);
+    float diff2 = max(dot(normal, uLight2Dir), 0.0);
+    vec3 lighting = uAmbientColor * uAmbientIntensity
+      + uLight1Color * diff1 * uLight1Intensity
+      + uLight2Color * diff2 * uLight2Intensity;
+
+    float n = fbm(vWorldPosition * 3.0 + uTime * 0.25);
+    vec3 noisyColor = mix(uBaseColor, uRimColor, n * 0.3 * uRichness);
+
+    float fresnel = pow(1.0 - clamp(dot(normal, viewDir), 0.0, 1.0), 2.5);
+    vec3 color = noisyColor * lighting + uRimColor * fresnel * 0.6 * uRichness;
+
+    gl_FragColor = vec4(color, 1.0);
+  }
+`
+
+const ARROW_RICHNESS: Record<Stage, number> = {
+  line: 0,
+  plane: 0.5,
+  cube: 1,
+  reveal: 1,
+  closing: 1,
+}
+
+// The fill light only exists in the real scene from the cube stage on (see
+// `Experience.tsx`'s `SceneLights`) — mirror that here so the arrow's hand-rolled
+// lighting never implies a light that isn't actually in the scene.
+function arrowFillIntensity(stage: Stage): number {
+  return stage === 'line' || stage === 'plane' ? 0 : LIGHT_RIG.fill.intensity
+}
+
+// Rebuilt whenever `stage` changes, rather than mutated in place, because
+// eslint-plugin-react-hooks' compiler-based immutability check treats a value returned
+// from `useMemo` as frozen everywhere outside its own factory — including inside a
+// `useEffect` — the same rule `withTimeUniform`'s doc comment above works around for
+// `uTime`. A fresh, cheap ShaderMaterial per stage change is the straightforward way to
+// stay inside that rule.
+export function useArrowMaterial(stage: Stage) {
+  return useMemo(() => {
+    const material = new ShaderMaterial({
+      uniforms: {
+        uTime: { value: 0 },
+        uBaseColor: { value: new Color('#ffb454') },
+        uRimColor: { value: new Color('#fff3d6') },
+        uRichness: { value: ARROW_RICHNESS[stage] },
+        uAmbientColor: { value: new Color(LIGHT_RIG.ambient.color) },
+        uAmbientIntensity: { value: LIGHT_RIG.ambient.intensity },
+        uLight1Dir: { value: lightDirection(LIGHT_RIG.key.position) },
+        uLight1Color: { value: new Color(LIGHT_RIG.key.color) },
+        uLight1Intensity: { value: LIGHT_RIG.key.intensity },
+        uLight2Dir: { value: lightDirection(LIGHT_RIG.fill.position) },
+        uLight2Color: { value: new Color(LIGHT_RIG.fill.color) },
+        uLight2Intensity: { value: arrowFillIntensity(stage) },
+      },
+      vertexShader: richnessVertexShader,
+      fragmentShader: arrowFragmentShader,
+    })
+    return withTimeUniform(material)
+  }, [stage])
 }
