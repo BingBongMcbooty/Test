@@ -10,8 +10,12 @@ async function canvasSnapshot(page: Page): Promise<Buffer> {
 async function dragCanvas(page: Page, dx: number, dy: number) {
   const box = await page.locator('canvas').boundingBox()
   if (!box) throw new Error('canvas has no bounding box')
-  const startX = box.x + box.width / 2
-  const startY = box.y + box.height / 2
+  // Off-center, in a corner: since Task 10, a drag starting on the stage's object (which
+  // every stage frames comfortably near canvas center) draws an arrow instead of
+  // orbiting. These tests care about orbit specifically, so they start from a corner the
+  // object's collider never reaches.
+  const startX = box.x + box.width * 0.08
+  const startY = box.y + box.height * 0.08
 
   await page.mouse.move(startX, startY)
   await page.mouse.down()
