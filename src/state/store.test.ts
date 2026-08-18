@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest'
-import { useDimensionsStore, type AttemptResult } from './store'
+import type { AttemptResult } from '../math/validation'
+import { useDimensionsStore } from './store'
 
 const getState = () => useDimensionsStore.getState()
 

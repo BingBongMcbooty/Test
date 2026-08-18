@@ -1,11 +1,6 @@
 import { create } from 'zustand'
-import { type Axis, type Stage, nextStage } from './stageConfig'
-
-export interface AttemptResult {
-  success: boolean
-  /** each occupied+leftover axis's share of the dragged vector's magnitude, fractions summing to ~1 */
-  axisContributions: Record<Axis, number>
-}
+import type { AttemptResult } from '../math/validation'
+import { type Stage, nextStage } from './stageConfig'
 
 interface DimensionsState {
   stage: Stage
