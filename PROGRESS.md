@@ -1,6 +1,6 @@
 # Progress
 
-**Next up:** Task 4 — Validation math
+**Next up:** Task 5 — Scene shell + stage router
 
 Status legend: ⬜ not started · 🔶 in progress · ✅ done
 
@@ -8,7 +8,7 @@ Status legend: ⬜ not started · 🔶 in progress · ✅ done
 - ✅ Task 1 — Project scaffold — `claude/dimensional-exploration-app-uj20jy` @ `cc3e7d9`, merged to default
 - ✅ Task 2 — Testing infrastructure — `claude/dimensional-exploration-app-uj20jy` @ `cc3e7d9`, merged to default
 - ✅ Task 3 — Global state store — `claude/task-3-baerqo` @ `ca95a8c`, merged to default
-- ⬜ Task 4 — Validation math
+- ✅ Task 4 — Validation math — `claude/task-4-yi7axu` @ `3dad0cd`, merged to default
 - ⬜ Task 5 — Scene shell + stage router
 - ⬜ Task 6 — Orbit interaction tuning
 
@@ -46,3 +46,7 @@ _(Add anything here that changed from the original plan as you go — tuned para
 - **Task 3:** `lastResult`'s shape (`AttemptResult`) isn't specified by PLAN.md, since `evaluateAttempt` doesn't exist until Task 4. Went with `{ success: boolean; axisContributions: Record<Axis, number> }` — a per-axis (x/y/z) fraction of the dragged vector's magnitude — since Task 11 needs x/y/z percentages for the cube-stage decomposition feedback and this covers that without baking in more of Task 4's math than necessary. Task 4 should treat this as the target shape for `evaluateAttempt`'s return value rather than inventing a separate one, but it's free to adjust the field if it doesn't fit once the actual projection math is written.
 - **Task 3:** Skipped the "optional" debug buttons for manually cycling `stage` (PLAN.md's verify step calls them optional) — no UI exists yet to hang them off until Task 5 builds the scene shell/HUD; `useDimensionsStore.getState().setStage(...)` is callable from the console in the meantime if needed.
 - **Task 3:** `attempts` is a per-stage counter that resets on both `setStage` and `advanceStage`, not a running total across the whole playthrough — matches Task 11's "N attempts on the cube stage" use case.
+- **Task 4:** Moved `AttemptResult` from `state/store.ts` into `math/validation.ts` (the module that actually produces it) and had the store import it — the more natural dependency direction, and what Task 3's note said Task 4 was free to do.
+- **Task 4:** `projectOntoComplement` doesn't do a general vector projection — occupied axes are always a subset of the standard basis, so it's just zeroing the occupied components. Worth remembering if a future task ever needs projection onto a non-axis-aligned subspace; this function isn't that.
+- **Task 4:** Used `ORTHOGONALITY_THRESHOLD = 0.7` exactly as specified in PLAN.md's tunables table. Test coverage straddles it with a 3-4-5 triangle (ratios 0.8 pass / 0.6 fail) rather than constructing a vector at the exact bit boundary, since an irrational hand-picked boundary vector risks flipping on floating-point rounding — the threshold constant itself is asserted directly instead.
+- **Task 4:** `axisContributions` is computed from the raw drag vector (`|axis| / sum of |axis|`), independent of which axes are occupied — it's the same breakdown regardless of stage, so Stage 3's decomposition feedback and any other stage would see consistent numbers for the same drag.
