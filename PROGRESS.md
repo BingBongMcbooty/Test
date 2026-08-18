@@ -1,6 +1,6 @@
 # Progress
 
-**Next up:** Task 6 — Orbit interaction tuning
+**Next up:** Task 7 — Drag-plane math *(new session recommended — see PLAN.md)*
 
 Status legend: ⬜ not started · 🔶 in progress · ✅ done
 
@@ -10,7 +10,7 @@ Status legend: ⬜ not started · 🔶 in progress · ✅ done
 - ✅ Task 3 — Global state store — `claude/task-3-baerqo` @ `ca95a8c`, merged to default
 - ✅ Task 4 — Validation math — `claude/task-4-yi7axu` @ `3dad0cd`, merged to default
 - ✅ Task 5 — Scene shell + stage router — `claude/task-5-lveobi` @ `ab2d3aa`, merged to default
-- ⬜ Task 6 — Orbit interaction tuning
+- ✅ Task 6 — Orbit interaction tuning — `claude/task-6-ssl7u1` @ `777aec2`, merged to default
 
 ## Drag interaction *(new session)*
 - ⬜ Task 7 — Drag-plane math
@@ -55,3 +55,7 @@ _(Add anything here that changed from the original plan as you go — tuned para
 - **Task 5:** Camera framing per stage lives in `scene/cameraFraming.ts` as fixed position/target pairs, applied via `CameraControls.setLookAt(..., false)` (`false` = no transition) on stage change — straightforward instant cut for now; Task 10 is where an animated transition would replace the `false`.
 - **Task 5:** Added `ui/DebugStageControls.tsx` (throwaway per Task 3's note) so Playwright — and anyone running `npm run dev` — can cycle stages without the real drag interaction that doesn't land until Tasks 7-10. It renders one button per `STAGE_ORDER` entry with `data-testid="debug-stage-{stage}"`. Delete this component once Task 10's real stage-advance wiring makes it redundant — don't let it survive into the shipped app.
 - **Task 5:** Verified via Playwright (`e2e/stage-shell.spec.ts`): loads on Stage 1's line, clicks through all five stages, asserts the HUD label updates each time, and screenshots each — reviewed by hand (not just "test passed"), which is what caught the cube material issue above.
+- **Task 6:** No config change was actually needed for "full 360° orbit, no clamping" — camera-controls' own defaults already give unrestricted azimuth (`±Infinity`) and the full polar range (`0`..`Math.PI`), plus comfortable damping (`smoothTime`/`draggingSmoothTime`). Made the orbit range explicit on `<CameraControls>` anyway (with a comment explaining why) so it's a stated decision instead of an implicit dependency on upstream defaults that could silently regress.
+- **Task 6:** "Over the top" doesn't mean continuous wraparound past the zenith — camera-controls hard-clamps its internal polar angle to `[minPolarAngle, maxPolarAngle]` (0..π is the natural full range for spherical coordinates; going further would require an azimuth-flip trick the library doesn't do). So the Playwright test's bar is: dragging far past the pole settles cleanly at the extreme without erroring or getting stuck, not that the view spins past it to the other side.
+- **Task 6:** `e2e/orbit.spec.ts`'s canvas-content assertions use `canvas.screenshot()`, not `canvas.toDataURL()` — the latter read back stale/blank pixels in a first pass, because three.js's `WebGLRenderer` runs with `preserveDrawingBuffer: false` by default. `page.screenshot()`/`locator.screenshot()` (compositor-based, what Task 5's test already used) is the reliable way to assert on WebGL canvas content in this app; worth remembering for any later e2e test that needs to detect a canvas change.
+- **Task 6:** Confirmed Task 5's per-stage camera distances hold up off the default angle too — orbited the cube stage to a couple of arbitrary angles and it stayed comfortably framed both times, so no distance retuning was needed.
