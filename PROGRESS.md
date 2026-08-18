@@ -1,6 +1,6 @@
 # Progress
 
-**Next up:** Task 8 — Drag-plane math *(new session recommended — see PLAN.md)*
+**Next up:** Task 9 — Arrow visual component
 
 Status legend: ⬜ not started · 🔶 in progress · ✅ done
 
@@ -14,7 +14,7 @@ Status legend: ⬜ not started · 🔶 in progress · ✅ done
 - ✅ Task 7 — Visual richness & material progression — `claude/visual-richness-material-progression-3m613e` @ `97aa056`, merged to default
 
 ## Drag interaction *(new session)*
-- ⬜ Task 8 — Drag-plane math
+- ✅ Task 8 — Drag-plane math — `claude/drag-plane-math-zto97s` @ `8bad661`, merged to default
 - ⬜ Task 9 — Arrow visual component
 - ⬜ Task 10 — Pointer/drag controller
 - ⬜ Task 11 — Validation wiring for Stages 1 & 2
@@ -67,3 +67,6 @@ _(Add anything here that changed from the original plan as you go — tuned para
 - **Task 7:** `fbm`'s octave count is 2, not the more typical 3 — a quick frame-rate check (`e2e/richness.spec.ts`'s "sustains a reasonable frame rate" test) showed the cube's shader roughly halving fps versus the unlit line stage in this sandbox's software-rendered headless Chromium (~55-60fps line vs ~25-30fps cube at 3 octaves); dropping to 2 octaves recovered most of that without a visible loss of texture detail at the noise strengths used here. The test's floor is set to a generous `>15fps` rather than a tighter number, since this sandbox's absolute fps numbers are noisy and about the environment as much as the shader — the point is catching a pathological regression, not chasing a precise budget.
 - **Task 7:** Plane stage's fill (`usePlaneFillMaterial`) uses a single light + weaker noise strength (no fresnel at all) versus the cube's two lights + fresnel — deliberately simpler, per PLAN.md leaving the exact "cross between" look undecided and asking for eye judgment. Landed on `uOpacity: 0.24` after an initial `0.12` pass read as almost invisible in the screenshot; the wireframe outline (rendered as a separate `lineSegments`, unchanged from Task 5) still reads as clearly primary against the fill at this level.
 - **Task 7:** `e2e/richness.spec.ts` only asserts on `console.error`-type messages, not `console.warn` — `@react-three/fiber` itself logs a `THREE.Clock` deprecation warning on every mount (unrelated to this task's code, which uses `THREE.Timer`), and asserting on warnings would make the test depend on fixing an upstream dependency's internals.
+- **Task 8:** `buildCameraFacingPlane`'s normal is the camera's forward direction (`camera.getWorldDirection()`), not the anchor-to-camera vector — the standard "billboard plane" approach (same idea `DragControls`/`TransformControls` use). These coincide whenever the camera is actually looking at the anchor, which is the case Task 10 needs (drag starts on the object currently in view), but the forward-direction version also works if that's ever not exactly true, so no reason to special-case it.
+- **Task 8:** Both functions take the `Raycaster` (and `raycastPointerOntoPlane` also implicitly drives it via `setFromCamera`) as a parameter rather than constructing one internally — lets Task 10 reuse a single `Raycaster` instance across pointer-move events instead of allocating one per frame, and keeps the module DOM-free/pure per PLAN.md's ask. `pointerNDC` is a plain `Vector2` in normalized device coordinates (`[-1, 1]` each axis); computing that from a raw pointer event's page coordinates against the canvas rect is Task 10's job, not this module's.
+- **Task 8:** Verified with hand-constructed `THREE.OrthographicCamera`s (not perspective) — an orthographic frustum makes the pointer-NDC-to-world-offset relationship exactly linear (`ndc * halfExtent`) with no perspective divide to compute by hand, which is what let the test comments hand-derive exact expected coordinates as PLAN.md's verify step asks for, including a case where the camera looks down a non-`z` world axis (confirms the plane/raycast genuinely follow the camera's orientation rather than assuming a fixed forward axis).
