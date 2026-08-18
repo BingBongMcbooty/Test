@@ -32,7 +32,19 @@ function CameraRig() {
     controlsRef.current?.setLookAt(...position, ...target, false)
   }, [stage])
 
-  return <CameraControls ref={controlsRef} makeDefault />
+  return (
+    <CameraControls
+      ref={controlsRef}
+      makeDefault
+      // Explicit full-orbit range (these happen to match camera-controls' own
+      // defaults, but declared rather than left implicit): nothing in this scene is
+      // grounded, so there's no "floor" to stop the player orbiting under or over.
+      minPolarAngle={0}
+      maxPolarAngle={Math.PI}
+      minAzimuthAngle={-Infinity}
+      maxAzimuthAngle={Infinity}
+    />
+  )
 }
 
 export function Experience() {
