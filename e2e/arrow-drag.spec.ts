@@ -50,17 +50,25 @@ test.describe('pointer/drag controller', () => {
     await page.screenshot({ path: 'e2e/screenshots/arrow-drag-line-at-rest.png' })
 
     const center = await canvasCenter(page)
-    await dragFrom(page, center, 150, -100)
+    // A roughly-horizontal drag on the line stage (occupiedAxes=['x']) lands well
+    // under Task 11's ORTHOGONALITY_THRESHOLD (empirically ~0.65, vs. 0.7 needed) —
+    // deterministically a fail, so this test (about drag mechanics, not validation
+    // outcomes — see validation-wiring.spec.ts for those) always exercises the fail
+    // path rather than sometimes advancing the stage.
+    await dragFrom(page, center, 200, 0)
 
     const midDrag = await canvasSnapshot(page)
     await page.screenshot({ path: 'e2e/screenshots/arrow-drag-line-mid-drag.png' })
     expect(midDrag).not.toEqual(atRest)
 
     await page.mouse.up()
-    await page.waitForTimeout(300)
+    // Task 11's fail cue (FAIL_CUE_DURATION = 0.45s) briefly lingers after release —
+    // wait for it to fully fade before checking the scene settled back to rest.
+    await page.waitForTimeout(700)
 
-    // CameraControls was disabled for the drag and never moved, and the live arrow
-    // clears on release — the scene should look exactly as it did before the drag.
+    // CameraControls was disabled for the drag and never moved, the fail cue has
+    // finished fading, and the live arrow clears on release — the scene should look
+    // exactly as it did before the drag.
     const afterRelease = await canvasSnapshot(page)
     expect(afterRelease).toEqual(atRest)
 

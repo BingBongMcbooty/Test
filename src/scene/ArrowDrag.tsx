@@ -4,6 +4,9 @@ import type { CameraControlsImpl } from '@react-three/drei'
 import { BoxGeometry, CylinderGeometry, DoubleSide, PlaneGeometry, Plane, Raycaster, Vector2, Vector3 } from 'three'
 import { useDimensionsStore } from '../state/store'
 import { buildCameraFacingPlane, raycastPointerOntoPlane } from '../math/dragPlane'
+import { evaluateAttempt } from '../math/validation'
+import { STAGE_CONFIG } from '../state/stageConfig'
+import { FAIL_CUE_DURATION, FailCueArrow } from './FailCueArrow'
 import { LiveArrow } from './LiveArrow'
 
 /**
@@ -36,6 +39,14 @@ interface LiveDrag {
  * miss does nothing, leaving `CameraControls`' own listeners to handle the orbit as
  * usual. Per CLAUDE.md, the live drag's points stay local component state — only the
  * `isDrawing` flag (a store concern since Task 3) is shared globally.
+ *
+ * Task 11: on pointer-up, a drag that cleared the dead zone is handed to
+ * `evaluateAttempt` (`math/validation.ts`) against the current stage's occupied axes.
+ * Success calls `advanceStage()` (the camera transition into the next stage lives in
+ * `Experience.tsx`'s `CameraRig`); failure freezes the drag as a `FailCueArrow` that
+ * flashes/fades in place instead of `LiveArrow`'s stage-driven material — see
+ * `FailCueArrow`'s doc comment for why that's a separate component rather than a
+ * change to `useArrowMaterial`.
  */
 export function ArrowDrag() {
   const stage = useDimensionsStore((state) => state.stage)
@@ -47,11 +58,13 @@ export function ArrowDrag() {
   const controlsFromStore = useThree((state) => state.controls) as CameraControlsImpl | null
 
   const [liveDrag, setLiveDrag] = useState<LiveDrag | null>(null)
+  const [failCue, setFailCue] = useState<LiveDrag | null>(null)
   const raycaster = useMemo(() => new Raycaster(), [])
   const dragPlaneRef = useRef<Plane | null>(null)
   const dragStartRef = useRef<Vector3 | null>(null)
   const dragEndRef = useRef<Vector3 | null>(null)
   const cleanupRef = useRef<(() => void) | null>(null)
+  const failCueTimeoutRef = useRef<number | null>(null)
   // `CameraControls` (drei's `makeDefault`-registered instance) is an external,
   // intentionally-mutable object — mirrored into a plain ref (rather than toggling
   // `.enabled` on the `useThree()`-selected value directly) since the compiler-based
@@ -62,6 +75,12 @@ export function ArrowDrag() {
     controlsRef.current = controlsFromStore
   }, [controlsFromStore])
 
+  useEffect(() => {
+    return () => {
+      if (failCueTimeoutRef.current !== null) window.clearTimeout(failCueTimeoutRef.current)
+    }
+  }, [])
+
   function pointerNDCFromClient(clientX: number, clientY: number): Vector2 {
     const rect = gl.domElement.getBoundingClientRect()
     return new Vector2(
@@ -70,19 +89,15 @@ export function ArrowDrag() {
     )
   }
 
-  function endDrag() {
-    cleanupRef.current?.()
-    cleanupRef.current = null
-    if (controlsRef.current) controlsRef.current.enabled = true
-    endDrawing()
-    dragPlaneRef.current = null
-    dragStartRef.current = null
-    dragEndRef.current = null
-    setLiveDrag(null)
-  }
-
   function handlePointerDown(event: ThreeEvent<PointerEvent>) {
     event.stopPropagation()
+
+    // A new drag pre-empts any fail cue still fading from the previous one.
+    if (failCueTimeoutRef.current !== null) {
+      window.clearTimeout(failCueTimeoutRef.current)
+      failCueTimeoutRef.current = null
+    }
+    setFailCue(null)
 
     const anchor = event.point.clone()
     dragPlaneRef.current = buildCameraFacingPlane(anchor, camera)
@@ -106,7 +121,38 @@ export function ArrowDrag() {
     }
 
     function onWindowPointerUp() {
-      endDrag()
+      cleanupRef.current?.()
+      cleanupRef.current = null
+      if (controlsRef.current) controlsRef.current.enabled = true
+      endDrawing()
+
+      const start = dragStartRef.current
+      const end = dragEndRef.current
+      dragPlaneRef.current = null
+      dragStartRef.current = null
+      dragEndRef.current = null
+      setLiveDrag(null)
+
+      // Too-short drags never counted as a real attempt (Task 10's dead zone) — discard
+      // without calling evaluateAttempt at all.
+      if (!start || !end || end.distanceTo(start) < MIN_DRAG_LENGTH) return
+
+      const dragVector = end.clone().sub(start)
+      const result = evaluateAttempt(
+        { x: dragVector.x, y: dragVector.y, z: dragVector.z },
+        STAGE_CONFIG[stage].occupiedAxes,
+      )
+      useDimensionsStore.getState().recordAttempt(result)
+
+      if (result.success) {
+        useDimensionsStore.getState().advanceStage()
+      } else {
+        setFailCue({ start, end })
+        failCueTimeoutRef.current = window.setTimeout(() => {
+          failCueTimeoutRef.current = null
+          setFailCue(null)
+        }, FAIL_CUE_DURATION * 1000)
+      }
     }
 
     window.addEventListener('pointermove', onWindowPointerMove)
@@ -139,6 +185,7 @@ export function ArrowDrag() {
         </mesh>
       )}
       {liveDrag && <LiveArrow start={liveDrag.start} end={liveDrag.end} />}
+      {failCue && <FailCueArrow start={failCue.start} end={failCue.end} />}
     </>
   )
 }

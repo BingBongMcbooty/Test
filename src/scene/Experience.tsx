@@ -58,7 +58,10 @@ function CameraRig() {
 
   useEffect(() => {
     const { position, target } = CAMERA_FRAMING[stage]
-    controlsRef.current?.setLookAt(...position, ...target, false)
+    // `true` enables camera-controls' own smoothed transition — Task 5 cut this in as
+    // an instant `setLookAt(..., false)`; Task 11 is where stage-advance actually
+    // happens via player interaction, so the cut is replaced with a real transition.
+    controlsRef.current?.setLookAt(...position, ...target, true)
   }, [stage])
 
   return (
