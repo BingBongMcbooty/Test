@@ -13,13 +13,13 @@ This is a brand-new repo — completely empty, no scaffolding of any kind — so
 | Decision | Choice |
 |---|---|
 | Stack | React + TypeScript + Vite, Three.js via `@react-three/fiber` + `@react-three/drei` |
-| State | Zustand (kept separate from high-frequency drag state, see Task 3/9) |
+| State | Zustand (kept separate from high-frequency drag state, see Task 3/10) |
 | Testing | Vitest for math/logic, Playwright for real-browser visual verification |
 | Arrow interaction | Click-drag in 3D space, live-rendered arrow, raycast onto a camera-facing plane |
 | Stage 3 behavior | Free, unlocked attempts; app shows *why* each attempt fails (axis decomposition), no artificial lock |
-| Cube rendering (Stage 3 on) | Solid, lit faces (`MeshStandardMaterial` + a directional light) with a thin wireframe edge overlay, translucent fill rather than fully opaque — depth reads without hiding the far side of the shape or a mid-drag arrow from any orbit angle. Stages 1–2 stay pure line geometry; a line/plane has no face to shade. |
-| Stage 4 visualization | Both, player-driven rather than autoplayed: cross-section slicing (4D tesseract sliced by a hyperplane, default view) and 4D→3D projection (flattened "shadow" view), toggled, both computed from one shared rotation/offset state that the player controls by dragging — see Task 12/13. |
-| Tone | Minimalist, philosophical — dark background, sparse geometry (wireframe for line/plane, solid-but-translucent lit faces with wireframe edges from the cube stage on), few well-chosen lines of text |
+| Cube rendering (Stage 3 on) | Full richness tier of the Stage 1→2→3 visual escalation (see Tone): a shader/texture-driven material (procedural, not image-based) plus a proper multi-light setup, still translucent enough that the far side of the shape and a mid-drag arrow stay legible from any orbit angle. Supersedes Task 5's flatter `MeshStandardMaterial` + single-light version — see Task 7. |
+| Stage 4 visualization | Both, player-driven rather than autoplayed: cross-section slicing (4D tesseract sliced by a hyperplane, default view) and 4D→3D projection (flattened "shadow" view), toggled, both computed from one shared rotation/offset state that the player controls by dragging — see Task 13/14. Continues Task 7's visual-escalation material system rather than reverting to something flatter. |
+| Tone | Philosophical throughout, but visually escalates with dimension rather than staying flat: Stage 1 (line) stays the sparest possible mark — pure wireframe, unchanged. Stage 2 (plane) is transitional, "a cross between the two" — wireframe stays primary but gains a first hint of shading/texture. Stage 3 (cube) on gets the full treatment: textured, multi-light, shader-driven materials (see Task 7). Text stays sparse and well-chosen at every stage — the escalation is visual, not verbal. *(Revised from the original flat "minimalist throughout" call.)* |
 | Platform | Desktop only — mouse + keyboard, no touch |
 | Persistence | None — single session, refresh resets to Stage 1 |
 | Scope | Ends with a brief "this repeats at every dimension" closing beat — no interactive 5D stage |
@@ -34,11 +34,14 @@ src/
   math/dragPlane.ts          # builds a camera-facing plane at the drag anchor; raycasts pointer onto it
   math/fourd.ts               # tesseract vertices/faces, 4D rotation, hyperplane slicing + 4D→3D projection
   scene/Experience.tsx          # Canvas, CameraControls, stage router
-  scene/ArrowDrag.tsx            # pointer-down/move/up: hit-test, mode switch, live drag feed
-  scene/LiveArrow.tsx             # shaft+cone arrow mesh between two points
+  scene/materials.ts             # shared shader/material defs + per-stage richness progression (Task 7)
+  scene/ArrowDrag.tsx             # pointer-down/move/up: hit-test, mode switch, live drag feed
+  scene/LiveArrow.tsx              # shaft+cone arrow mesh between two points
   scene/stages/{Line,Plane,Cube,Reveal}Stage.tsx
   ui/HUD.tsx, ui/FeedbackPanel.tsx
 ```
+
+**Why visual richness escalates with dimension:** the app's core idea is that more axes unlock more of what's expressible — line → plane → cube keeps *adding room to move*. Task 7 makes that legible at the material level too: Stage 1 stays the sparest possible mark (a single wireframe line), Stage 2 gains a first hint of surface, and Stage 3 arrives fully lit, textured, and shaded. The growing visual weight tracks the growing dimensional freedom, instead of the whole app looking uniformly minimal regardless of how much is actually happening on screen.
 
 **Why one drag mechanic serves all three stages:** each stage just declares which axes are already "occupied" (line → X; plane → X,Y; cube → X,Y,Z). Validation projects the drawn vector onto the occupied subspace and checks what's left over. For the cube, the occupied subspace *is* all of 3D space, so the leftover is always exactly zero — Stage 3 fails not because of a special case, but because there's genuinely nowhere left to point. That's what makes the surprise real instead of scripted.
 
@@ -89,59 +92,64 @@ Verify: Playwright — load the page, see Stage 1's line; use the Task 3 debug b
 Deliverable: confirm full 360° free orbit with no clamping, sensible per-stage camera distances, comfortable damping.
 Verify: Playwright simulated drags in several directions (including "over the top"); before/after screenshots.
 
-**— New session recommended here. The foundation (state, shell, orbit) is done; the drag-to-arrow interaction is the hardest subsystem in the app and deserves a clean start. —**
+**Task 7 — Visual richness & material progression**
+Deliverable: `scene/materials.ts` — a shared shader/material system driving deliberate visual escalation instead of a flat treatment across stages. Stage 1 (line) stays exactly as it is — it already reads well, don't touch it. Stage 2 (plane) becomes transitional, "a cross between the two": the wireframe outline stays primary, but the fill gains a first hint of shading/texture (e.g. a faint lit or animated surface, well short of full opacity) foreshadowing what's coming. Stage 3 (cube) onward gets the full treatment: a proper multi-light setup (beyond flat ambient + one directional light), and shader/texture detail — prefer procedural (noise/fresnel-driven `ShaderMaterial`, or drei's `shaderMaterial` helper) over sourced image textures, since there's no texture-asset pipeline in this repo yet. The cube's far side and a mid-drag arrow still need to stay legible through it from any orbit angle — same constraint Task 5 had, just with a richer material meeting it.
+Verify: Playwright screenshots per stage, reviewed by hand against the escalation goal — Stage 1 unchanged, Stage 2 visibly "in between," Stage 3 visibly richer than Task 5's flat version. Confirm no console/shader-compile errors and a rough frame-rate sanity check, since shaders can be expensive.
+*Design work like this wants a lot of "look at it, adjust, look again" cycles. Likely a candidate for splitting — e.g. nail the cube's shader/lighting first, then retrofit the Stage 1→2 progression — if it doesn't converge in one session, same as Tasks 10/13/14.*
 
-**Task 7 — Drag-plane math**
+**— New session recommended here. The foundation (state, shell, orbit, visual identity) is done; the drag-to-arrow interaction is the hardest subsystem in the app and deserves a clean start. —**
+
+**Task 8 — Drag-plane math**
 Deliverable: `math/dragPlane.ts` — pure functions building the camera-facing plane at an anchor point and raycasting a pointer position onto it. Unit-testable with hand-constructed camera/raycaster objects, no DOM needed.
 Verify: `npm test` with a few camera-orientation cases confirming the plane faces the camera and raycasts land correctly.
 
-**Task 8 — Arrow visual component**
-Deliverable: `scene/LiveArrow.tsx` — shaft + cone between two `Vector3` points, styled to the minimal aesthetic. Drive it via temporary debug props (no interactivity yet).
+**Task 9 — Arrow visual component**
+Deliverable: `scene/LiveArrow.tsx` — shaft + cone between two `Vector3` points, styled consistently with each stage's material treatment from Task 7 rather than one fixed look. Drive it via temporary debug props (no interactivity yet).
 Verify: toggle debug props, confirm it renders/updates and points the right way; screenshot.
 
-**Task 9 — Pointer/drag controller**
-Deliverable: `scene/ArrowDrag.tsx` — pointer-down hit-tests the current stage's object (give the line/plane an invisible, slightly inflated collider so they're clickable), enters draw mode and disables `CameraControls` for the drag, feeds `LiveArrow` from Task 7's plane math on pointer-move, restores orbit on pointer-up, discards too-short drags. No pass/fail logic yet.
-Verify: Playwright — simulate a drag starting on the object (arrow appears mid-drag, screenshot) vs. starting off the object (camera orbits instead); on the cube stage, confirm the arrow still reads clearly against the solid translucent faces from a couple of orbit angles.
+**Task 10 — Pointer/drag controller**
+Deliverable: `scene/ArrowDrag.tsx` — pointer-down hit-tests the current stage's object (give the line/plane an invisible, slightly inflated collider so they're clickable), enters draw mode and disables `CameraControls` for the drag, feeds `LiveArrow` from Task 8's plane math on pointer-move, restores orbit on pointer-up, discards too-short drags. No pass/fail logic yet.
+Verify: Playwright — simulate a drag starting on the object (arrow appears mid-drag, screenshot) vs. starting off the object (camera orbits instead); on the cube stage, confirm the arrow still reads clearly against Task 7's material from a couple of orbit angles.
 *This is likely the fiddliest task in the build. If it's not converging in one session, split "hit-test + mode switching" from "live arrow feed" into two sessions rather than pushing through.*
 
-**Task 10 — Validation wiring for Stages 1 & 2**
+**Task 11 — Validation wiring for Stages 1 & 2**
 Deliverable: on pointer-up, call `evaluateAttempt`; success advances the stage with a smooth camera transition into the next one; failure shows a brief fail cue (arrow flashes/fades), stays on the same stage.
 Verify: Playwright — a roughly-orthogonal drag on Stage 1 advances to "plane"; a roughly-parallel drag stays on "line" with a fail cue; repeat for Stage 2 → reaches "cube".
 
 **— New session recommended here. Stages 1–2 are fully playable end-to-end; Stage 3 needs its own distinct feedback UI. —**
 
-**Task 11 — Stage 3 (cube) + decomposition feedback**
+**Task 12 — Stage 3 (cube) + decomposition feedback**
 Deliverable: cube stage reuses the drag mechanic unmodified. On every pointer-up, show the x/y/z decomposition from `evaluateAttempt` (structurally always a "fail" here), increment `attempts`, show an "I understand" button, transition to `reveal` after N attempts (start with N=3, treat as tunable) or on the button click.
 Verify: Playwright — a couple of cube drags stay on "cube" and show plausible non-zero x/y/z percentages; enough attempts (or the button) transitions to "reveal".
 
 **— New session recommended here. The interactive puzzle is complete; Stage 4 is a self-contained animation subsystem with its own math. —**
 
-**Task 12 — 4D math core**
+**Task 13 — 4D math core**
 Deliverable: `math/fourd.ts` — tesseract vertex generation (16 vertices), face generation via the axis-pair method (24 faces, no hardcoded table needed), `rotateXW`/`rotateYZ`. Two rendering paths off the same rotated vertices: (a) hyperplane slicing per face (no convex-hull library required — slice each square face's 4 edges directly) and (b) `projectTo3D`, a perspective 4D→3D projection ("drop w" with distance-based scaling, the same idea as the classic rotating-tesseract animation) that flattens the whole shape instead of slicing it. Thorough Vitest coverage: correct vertex/face counts; the known slicing case (axis-aligned tesseract sliced at w=0 yields exactly a cube's 12 edges); a sanity sweep across rotation angles with no NaNs, for both the slicing and projection paths.
 Verify: `npm test`. This is the highest-risk math in the app, and it's now two techniques instead of one — get both fully green before touching rendering. If it's not converging, do the slicing half and the projection half as two separate sessions rather than forcing both into one.
 *Fallback if slicing stalls: a 4D hypersphere sliced by w=w0 (radius = √(R²−w0²)) is simpler, still mathematically real, and matches the classic "sphere passing through Flatland looks like a growing-then-shrinking circle" analogy.*
-*Fallback if the perspective projection stalls: a plain orthographic projection (just drop the w coordinate, no distance scaling) is less visually dramatic but trivial to implement and still mathematically real — fine for Task 13 to build against. Don't burn a whole extra session chasing the perspective version — swap to whichever fallback you need and move on.*
+*Fallback if the perspective projection stalls: a plain orthographic projection (just drop the w coordinate, no distance scaling) is less visually dramatic but trivial to implement and still mathematically real — fine for Task 14 to build against. Don't burn a whole extra session chasing the perspective version — swap to whichever fallback you need and move on.*
 
-**Task 13 — Reveal scene**
-Deliverable: `scene/stages/RevealStage.tsx` — renders the tesseract as `THREE.LineSegments` in one of two views, `revealView: 'slice' | 'projection'` (add to the Task 3 store), both computed from one shared piece of 4D state (rotation angles, slice `w0`). Instead of autoplaying, the player drives that state directly: reuse `math/dragPlane.ts`'s camera-facing-plane raycast so a horizontal drag maps to 4D rotation and a depth/vertical drag maps to the slice offset — the same drag mechanic as Stages 1–3, repurposed rather than re-invented. A toggle button swaps `revealView` without resetting the underlying rotation/offset. Camera transition into the stage, short caption line.
+**Task 14 — Reveal scene**
+Deliverable: `scene/stages/RevealStage.tsx` — renders the tesseract as `THREE.LineSegments` in one of two views, `revealView: 'slice' | 'projection'` (add to the Task 3 store), both computed from one shared piece of 4D state (rotation angles, slice `w0`). Instead of autoplaying, the player drives that state directly: reuse `math/dragPlane.ts`'s camera-facing-plane raycast so a horizontal drag maps to 4D rotation and a depth/vertical drag maps to the slice offset — the same drag mechanic as Stages 1–3, repurposed rather than re-invented. A toggle button swaps `revealView` without resetting the underlying rotation/offset. Camera transition into the stage, short caption line. Extend Task 7's material/lighting system here rather than reverting to something flatter — the visual escalation should carry through into 4D, not stop at the cube.
 Verify: Playwright — drag at a few points and confirm the rendered wireframe topology changes in response to input (not on a timer); toggle the view and confirm slice/projection render the same underlying state two different ways; screenshot each view a beat apart to show it's responsive, not a canned loop.
-*This task grew with the addition of interactivity and the view toggle — if it's not converging in one session alongside Task 12, treat "get slicing and projection both rendering, non-interactively" and "wire up drag control + the toggle" as two separate sessions.*
+*This task grew with the addition of interactivity and the view toggle — if it's not converging in one session alongside Task 13, treat "get slicing and projection both rendering, non-interactively" and "wire up drag control + the toggle" as two separate sessions.*
 
-**Task 14 — Closing beat + restart**
+**Task 15 — Closing beat + restart**
 Deliverable: after the player has explored Stage 4 for a bit (a rotation/drag-count threshold, or on a "continue" click), fade in the closing line (something like "A 4-dimensional being trying to point to a 5th dimension hits the exact same wall.") and a restart button resetting to Stage 1.
 Verify: Playwright confirms the text appears and restart returns cleanly to Stage 1.
 
 **— New session recommended here. The core experience is complete; what's left is regression-proofing and polish. —**
 
-**Task 15 — Full-playthrough regression test**
+**Task 16 — Full-playthrough regression test**
 Deliverable: one Playwright test scripting the entire path (Stage 1 pass → Stage 2 pass → a few Stage 3 fails → give up → Stage 4 → closing → restart), as a safety net for future changes. Fix any rough edges it surfaces.
 Verify: the test passing is the verification; also save a screenshot per stage.
 
-**Task 16 — Visual/tone polish** *(optional, flexible ordering)*
-Deliverable: refine wireframe materials/line weights/colors, HUD typography, subtle stage-transition fades, progress indicator, final copy pass.
-Verify: screenshots reviewed against the "minimalist/philosophical" tone — worth a quick look-over before calling it done, since tone is subjective.
+**Task 17 — Visual/tone polish** *(optional, flexible ordering)*
+Deliverable: refine materials/line weights/colors, HUD typography, subtle stage-transition fades, progress indicator, final copy pass.
+Verify: screenshots reviewed against the Task 7 escalation goal (not the old flat "minimalist throughout" one) — worth a quick look-over before calling it done, since tone is subjective.
 
-**Task 17 — Deploy** *(optional, only if you want it live somewhere)*
+**Task 18 — Deploy** *(optional, only if you want it live somewhere)*
 Deliverable: static deploy config (Vercel/Netlify/GitHub Pages) for the Vite build output.
 Verify: `npm run build && npm run preview` matches dev behavior; deployed URL loads correctly.
 
@@ -151,10 +159,12 @@ Verify: `npm run build && npm run preview` matches dev behavior; deployed URL lo
 
 - **Angular tolerance for "roughly orthogonal"** (Task 4): `ratio >= 0.7` (~44° tolerance) as a starting point — worth an actual playtest to see if it feels right.
 - **Axis convention** (line=X, plane=XY, cube=XYZ): arbitrary but touches many files once set — fine to leave as-is, but this is the one thing costly to change later, so a quick sanity check before Task 5 is worth it.
-- **Attempts before Stage 4** (Task 11): defaulted to 3.
-- **"Give up" button visibility** (Task 11): defaulted to appearing after the first failed attempt, to encourage one genuine try first.
-- **Cube face translucency** (Task 5): opacity needs to be low enough that the far side of the cube and a mid-drag arrow stay legible through it, high enough to actually read as "solid" rather than wireframe-with-a-tint — tune by eye during Task 5/9.
-- **Drag-to-rotation and drag-to-slice-offset sensitivity** (Task 13): how much 4D rotation angle / `w0` offset a given pixel-drag distance produces — no default chosen yet, tune during Task 13's own playtest.
+- **Attempts before Stage 4** (Task 12): defaulted to 3.
+- **"Give up" button visibility** (Task 12): defaulted to appearing after the first failed attempt, to encourage one genuine try first.
+- **Cube face translucency & richness** (Task 5, superseded by Task 7): opacity needs to be low enough that the far side of the cube and a mid-drag arrow stay legible through it, high enough to read as "solid." Task 5's flat baseline (`opacity: 0.45`, `#5858a0`) gets replaced entirely by Task 7's shader material — re-tune against the same legibility constraint by eye, and check again once Task 10 has a real mid-drag arrow to test against.
+- **Plane stage's "transitional" treatment** (Task 7): exactly what "a cross between the two" looks like — a faint fill, emissive edges, animated shader noise, something else — is intentionally left undecided here. Pick something during Task 7's own playtest and iterate by eye rather than over-specifying it in this doc.
+- **Shader/texture approach** (Task 7): procedural (noise/fresnel-driven `ShaderMaterial`) recommended over sourced image textures, since this repo has no texture-asset pipeline yet — revisit if that turns out to be too limiting for the look you want.
+- **Drag-to-rotation and drag-to-slice-offset sensitivity** (Task 14): how much 4D rotation angle / `w0` offset a given pixel-drag distance produces — no default chosen yet, tune during Task 14's own playtest.
 
 ## Verification philosophy throughout
 

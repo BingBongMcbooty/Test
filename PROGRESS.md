@@ -1,6 +1,6 @@
 # Progress
 
-**Next up:** Task 7 — Drag-plane math *(new session recommended — see PLAN.md)*
+**Next up:** Task 7 — Visual richness & material progression
 
 Status legend: ⬜ not started · 🔶 in progress · ✅ done
 
@@ -11,30 +11,32 @@ Status legend: ⬜ not started · 🔶 in progress · ✅ done
 - ✅ Task 4 — Validation math — `claude/task-4-yi7axu` @ `3dad0cd`, merged to default
 - ✅ Task 5 — Scene shell + stage router — `claude/task-5-lveobi` @ `ab2d3aa`, merged to default
 - ✅ Task 6 — Orbit interaction tuning — `claude/task-6-ssl7u1` @ `777aec2`, merged to default
+- ⬜ Task 7 — Visual richness & material progression *(new — see "Design pivot" note below; new session recommended after this one, see PLAN.md)*
 
 ## Drag interaction *(new session)*
-- ⬜ Task 7 — Drag-plane math
-- ⬜ Task 8 — Arrow visual component
-- ⬜ Task 9 — Pointer/drag controller
-- ⬜ Task 10 — Validation wiring for Stages 1 & 2
+- ⬜ Task 8 — Drag-plane math
+- ⬜ Task 9 — Arrow visual component
+- ⬜ Task 10 — Pointer/drag controller
+- ⬜ Task 11 — Validation wiring for Stages 1 & 2
 
 ## Stage 3 *(new session)*
-- ⬜ Task 11 — Stage 3 (cube) + decomposition feedback
+- ⬜ Task 12 — Stage 3 (cube) + decomposition feedback
 
 ## Stage 4 *(new session)*
-- ⬜ Task 12 — 4D math core
-- ⬜ Task 13 — Reveal scene
-- ⬜ Task 14 — Closing beat + restart
+- ⬜ Task 13 — 4D math core
+- ⬜ Task 14 — Reveal scene
+- ⬜ Task 15 — Closing beat + restart
 
 ## Regression & polish *(new session)*
-- ⬜ Task 15 — Full-playthrough regression test
-- ⬜ Task 16 — Visual/tone polish *(optional)*
-- ⬜ Task 17 — Deploy *(optional)*
+- ⬜ Task 16 — Full-playthrough regression test
+- ⬜ Task 17 — Visual/tone polish *(optional)*
+- ⬜ Task 18 — Deploy *(optional)*
 
 ## Notes / deviations from PLAN.md
 
 _(Add anything here that changed from the original plan as you go — tuned parameters, fallback approaches taken, anything a future session should know that isn't in PLAN.md.)_
 
+- **Design pivot (after Task 6, before Task 7):** after trying the Foundation build locally, decided the original "minimalist throughout" tone (PLAN.md's old Tone/Cube-rendering rows) was too flat in 3D — wanted real textures/lighting/shader work, with visual richness escalating by dimension rather than staying uniform: Stage 1 (line) unchanged, Stage 2 (plane) transitional ("a cross between the two"), Stage 3 (cube) on gets the full textured/shaded/multi-light treatment. This added a new **Task 7 — Visual richness & material progression** to PLAN.md's Foundation group, which pushed every task from the old Task 7 onward up by one number (old Task 7 "Drag-plane math" is now Task 8, and so on through old Task 17 "Deploy" now Task 18). Nothing from Tasks 1-6 was renumbered or redone — only PLAN.md/PROGRESS.md's forward-looking task numbers and cross-references shifted; all git history, commit messages, and branch names for Tasks 1-6 keep their original numbers as committed. Task 5's flat cube material (`MeshStandardMaterial`, `opacity: 0.45`) and Task 6's orbit-tuning work stand as before — Task 7 supersedes the material, not the orbit or state work.
 - `npm create vite@latest .` refuses to scaffold into a non-empty directory (this repo has CLAUDE.md/PLAN.md/PROGRESS.md) even with piped input; scaffolded into a scratch dir and copied the generated files in instead.
 - The current `create-vite` react-ts template defaults to oxlint instead of ESLint. Removed oxlint/`.oxlintrc.json` and set up ESLint 10 (flat config) + `typescript-eslint` + `eslint-plugin-react-hooks`/`eslint-plugin-react-refresh` + Prettier (with `eslint-config-prettier` to disable stylistic overlap), per PLAN.md's "ESLint/Prettier" requirement. Note: `eslint-plugin-react-hooks`'s flat-config export for `recommended-latest` lives under `reactHooks.configs.flat['recommended-latest']`, not `reactHooks.configs['recommended-latest']` (that one is eslintrc-style and throws under flat config).
 - Test cube uses `EdgesGeometry`/`lineSegments` rather than `meshBasicMaterial wireframe` on a `boxGeometry` — the latter draws the triangulation diagonals across each face, which looks wrong for the "sparse wireframe" tone; `EdgesGeometry` gives the expected clean 12-edge cube.
@@ -43,17 +45,17 @@ _(Add anything here that changed from the original plan as you go — tuned para
 - **Task 2:** Vitest config lives inline in `vite.config.ts` (via `/// <reference types="vitest/config" />`) rather than a separate file; `test.exclude` adds `e2e/**` so Playwright's `test()` doesn't collide with Vitest's collector (they'd otherwise both try to claim files under `e2e/`).
 - This sandbox's preinstalled Playwright browser cache only has the regular Chromium build, not the `chromium_headless_shell` Playwright's default project wants — `playwright.config.ts` pins `use.launchOptions.executablePath` to `/opt/pw-browsers/chromium` to avoid a browser download attempt. Worth rechecking if this app is ever built/tested outside this sandbox.
 - `e2e/screenshots/` is gitignored (Playwright output, regenerated by the test).
-- **Task 3:** `lastResult`'s shape (`AttemptResult`) isn't specified by PLAN.md, since `evaluateAttempt` doesn't exist until Task 4. Went with `{ success: boolean; axisContributions: Record<Axis, number> }` — a per-axis (x/y/z) fraction of the dragged vector's magnitude — since Task 11 needs x/y/z percentages for the cube-stage decomposition feedback and this covers that without baking in more of Task 4's math than necessary. Task 4 should treat this as the target shape for `evaluateAttempt`'s return value rather than inventing a separate one, but it's free to adjust the field if it doesn't fit once the actual projection math is written.
+- **Task 3:** `lastResult`'s shape (`AttemptResult`) isn't specified by PLAN.md, since `evaluateAttempt` doesn't exist until Task 4. Went with `{ success: boolean; axisContributions: Record<Axis, number> }` — a per-axis (x/y/z) fraction of the dragged vector's magnitude — since Task 12 needs x/y/z percentages for the cube-stage decomposition feedback and this covers that without baking in more of Task 4's math than necessary. Task 4 should treat this as the target shape for `evaluateAttempt`'s return value rather than inventing a separate one, but it's free to adjust the field if it doesn't fit once the actual projection math is written.
 - **Task 3:** Skipped the "optional" debug buttons for manually cycling `stage` (PLAN.md's verify step calls them optional) — no UI exists yet to hang them off until Task 5 builds the scene shell/HUD; `useDimensionsStore.getState().setStage(...)` is callable from the console in the meantime if needed.
-- **Task 3:** `attempts` is a per-stage counter that resets on both `setStage` and `advanceStage`, not a running total across the whole playthrough — matches Task 11's "N attempts on the cube stage" use case.
+- **Task 3:** `attempts` is a per-stage counter that resets on both `setStage` and `advanceStage`, not a running total across the whole playthrough — matches Task 12's "N attempts on the cube stage" use case.
 - **Task 4:** Moved `AttemptResult` from `state/store.ts` into `math/validation.ts` (the module that actually produces it) and had the store import it — the more natural dependency direction, and what Task 3's note said Task 4 was free to do.
 - **Task 4:** `projectOntoComplement` doesn't do a general vector projection — occupied axes are always a subset of the standard basis, so it's just zeroing the occupied components. Worth remembering if a future task ever needs projection onto a non-axis-aligned subspace; this function isn't that.
 - **Task 4:** Used `ORTHOGONALITY_THRESHOLD = 0.7` exactly as specified in PLAN.md's tunables table. Test coverage straddles it with a 3-4-5 triangle (ratios 0.8 pass / 0.6 fail) rather than constructing a vector at the exact bit boundary, since an irrational hand-picked boundary vector risks flipping on floating-point rounding — the threshold constant itself is asserted directly instead.
 - **Task 4:** `axisContributions` is computed from the raw drag vector (`|axis| / sum of |axis|`), independent of which axes are occupied — it's the same breakdown regardless of stage, so Stage 3's decomposition feedback and any other stage would see consistent numbers for the same drag.
-- **Task 5:** `scene/stages/{Reveal}Stage.tsx` doesn't exist yet — the router's `switch` falls through to `null` for `'reveal'`/`'closing'`, so cycling to them via the debug buttons shows an empty scene (HUD text still updates correctly) rather than erroring. Tasks 13/14 add the real content; no router change needed then beyond adding the two cases.
-- **Task 5:** Cube face material needed eye-tuning beyond PLAN.md's starting guess — first pass (`opacity: 0.28`, `color: #3a3a52`) read as barely-there wireframe-with-a-tint in the screenshot; bumped to `opacity: 0.45`, `color: #5858a0` (a lighter indigo) which clearly reads as solid while the far edges stay visible through the near faces. Worth another look once Task 9 has a mid-drag arrow inside the cube to check it stays legible too.
-- **Task 5:** Camera framing per stage lives in `scene/cameraFraming.ts` as fixed position/target pairs, applied via `CameraControls.setLookAt(..., false)` (`false` = no transition) on stage change — straightforward instant cut for now; Task 10 is where an animated transition would replace the `false`.
-- **Task 5:** Added `ui/DebugStageControls.tsx` (throwaway per Task 3's note) so Playwright — and anyone running `npm run dev` — can cycle stages without the real drag interaction that doesn't land until Tasks 7-10. It renders one button per `STAGE_ORDER` entry with `data-testid="debug-stage-{stage}"`. Delete this component once Task 10's real stage-advance wiring makes it redundant — don't let it survive into the shipped app.
+- **Task 5:** `scene/stages/{Reveal}Stage.tsx` doesn't exist yet — the router's `switch` falls through to `null` for `'reveal'`/`'closing'`, so cycling to them via the debug buttons shows an empty scene (HUD text still updates correctly) rather than erroring. Tasks 14/15 add the real content; no router change needed then beyond adding the two cases.
+- **Task 5:** Cube face material needed eye-tuning beyond PLAN.md's starting guess — first pass (`opacity: 0.28`, `color: #3a3a52`) read as barely-there wireframe-with-a-tint in the screenshot; bumped to `opacity: 0.45`, `color: #5858a0` (a lighter indigo) which clearly reads as solid while the far edges stay visible through the near faces. Superseded by Task 7's shader material — see the "Design pivot" note below. Worth another look once Task 10 has a mid-drag arrow inside the cube to check it stays legible too.
+- **Task 5:** Camera framing per stage lives in `scene/cameraFraming.ts` as fixed position/target pairs, applied via `CameraControls.setLookAt(..., false)` (`false` = no transition) on stage change — straightforward instant cut for now; Task 11 is where an animated transition would replace the `false`.
+- **Task 5:** Added `ui/DebugStageControls.tsx` (throwaway per Task 3's note) so Playwright — and anyone running `npm run dev` — can cycle stages without the real drag interaction that doesn't land until Tasks 8-11. It renders one button per `STAGE_ORDER` entry with `data-testid="debug-stage-{stage}"`. Delete this component once Task 11's real stage-advance wiring makes it redundant — don't let it survive into the shipped app.
 - **Task 5:** Verified via Playwright (`e2e/stage-shell.spec.ts`): loads on Stage 1's line, clicks through all five stages, asserts the HUD label updates each time, and screenshots each — reviewed by hand (not just "test passed"), which is what caught the cube material issue above.
 - **Task 6:** No config change was actually needed for "full 360° orbit, no clamping" — camera-controls' own defaults already give unrestricted azimuth (`±Infinity`) and the full polar range (`0`..`Math.PI`), plus comfortable damping (`smoothTime`/`draggingSmoothTime`). Made the orbit range explicit on `<CameraControls>` anyway (with a comment explaining why) so it's a stated decision instead of an implicit dependency on upstream defaults that could silently regress.
 - **Task 6:** "Over the top" doesn't mean continuous wraparound past the zenith — camera-controls hard-clamps its internal polar angle to `[minPolarAngle, maxPolarAngle]` (0..π is the natural full range for spherical coordinates; going further would require an azimuth-flip trick the library doesn't do). So the Playwright test's bar is: dragging far past the pole settles cleanly at the extreme without erroring or getting stuck, not that the view spins past it to the other side.

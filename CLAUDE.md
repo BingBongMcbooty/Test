@@ -13,7 +13,7 @@ An interactive web app that teaches spatial dimensions experientially — line �
 
 - React + TypeScript + Vite
 - Three.js via `@react-three/fiber` + `@react-three/drei` (`CameraControls`, not raw `OrbitControls`)
-- Zustand for stage/app state. Per-drag interaction state (the live arrow being drawn) stays local to components, not in the store — see PLAN.md's Task 3/9 notes for why.
+- Zustand for stage/app state. Per-drag interaction state (the live arrow being drawn) stays local to components, not in the store — see PLAN.md's Task 3/10 notes for why.
 - Vitest for math/logic unit tests, Playwright for real-browser verification
 - `src/state/`, `src/math/`, `src/scene/`, `src/ui/` — see PLAN.md's architecture diagram for what lives where
 
@@ -30,7 +30,7 @@ An interactive web app that teaches spatial dimensions experientially — line �
 - Commit at the end of each completed task, referencing the task number, e.g. `Task 4: add validation math`.
 - Update `PROGRESS.md` — check off the task, note anything that deviated from the plan — before ending the session. When you check off a task, **record where that work actually landed**, not just that it's done: the branch name and commit SHA, and whether it's merged into the default branch yet (e.g. `✅ Task 2 — claude/task-2-rky5rd @ cc3e7d9, merged to default`). A bare checkmark is exactly what caused a past session to redo Task 1 from scratch — it didn't lie, it just didn't say *where*, so the next session had no way to tell "done" from "done somewhere I can't see."
 - **Merge your finished task's commit(s) into the repo's default branch and push it there too** (not just your task branch) before ending the session, when the merge is a clean fast-forward or otherwise conflict-free. The default branch is the single source of truth the next session's step 1 above checks against — if work only ever lands on disposable per-task branches, the default branch's `PROGRESS.md` goes stale and the next session can waste a whole run duplicating what you just did. If the merge isn't clean (a previous session's task branch never got merged either), stop and reconcile that before starting new work — don't stack another divergent branch on top. If you can't merge back at all (conflict you can't resolve, no push access, whatever) say so explicitly in the PROGRESS.md entry above, so the next session knows to go find the work instead of assuming the default branch already has it.
-- If a task isn't converging, stop and split it into two sessions rather than pushing through a single long one. PLAN.md already flags Tasks 9, 12, and 13 as the likeliest candidates for this.
+- If a task isn't converging, stop and split it into two sessions rather than pushing through a single long one. PLAN.md already flags Tasks 7, 10, 13, and 14 as the likeliest candidates for this.
 - Trust the codebase and `PROGRESS.md` over memory of past sessions. A fresh session has no memory of earlier ones — verify claims ("this is already working") by actually running things, not by assuming a prior session's notes were accurate.
 - Before yielding for the next prompt, give a one-line context-window check-in: flag it if the conversation is getting long, if earlier context appears to have been auto-summarized, or roughly how many turns/tasks deep the session is. There's no tool access to an exact token count, so keep this qualitative — don't state a precise number or percentage.
 
