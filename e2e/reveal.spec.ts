@@ -1,4 +1,11 @@
 import { test, expect, type Page } from '@playwright/test'
+import {
+  TESSERACT_FACES,
+  TESSERACT_VERTICES,
+  rotateXW,
+  rotateYW,
+  sliceTesseract,
+} from '../src/math/fourd'
 
 interface CanvasPoint {
   x: number
@@ -7,7 +14,8 @@ interface CanvasPoint {
 
 interface RevealState {
   revealView: 'slice' | 'projection'
-  revealRotation: number
+  revealRotationXW: number
+  revealRotationYW: number
   revealSliceW0: number
 }
 
@@ -17,11 +25,19 @@ async function canvasCenter(page: Page): Promise<CanvasPoint> {
   return { x: box.x + box.width / 2, y: box.y + box.height / 2 }
 }
 
-async function dragFrom(page: Page, from: CanvasPoint, dx: number, dy: number) {
+async function dragFrom(
+  page: Page,
+  from: CanvasPoint,
+  dx: number,
+  dy: number,
+  options?: { shift?: boolean },
+) {
+  if (options?.shift) await page.keyboard.down('Shift')
   await page.mouse.move(from.x, from.y)
   await page.mouse.down()
   await page.mouse.move(from.x + dx, from.y + dy, { steps: 20 })
   await page.mouse.up()
+  if (options?.shift) await page.keyboard.up('Shift')
 }
 
 // store.ts's dev-only `window.__dimensionsStore` hook — see its comment for why this
@@ -36,8 +52,8 @@ function revealState(page: Page): Promise<RevealState> {
         __dimensionsStore: { getState: () => RevealState }
       }
     ).__dimensionsStore
-    const { revealView, revealRotation, revealSliceW0 } = store.getState()
-    return { revealView, revealRotation, revealSliceW0 }
+    const { revealView, revealRotationXW, revealRotationYW, revealSliceW0 } = store.getState()
+    return { revealView, revealRotationXW, revealRotationYW, revealSliceW0 }
   })
 }
 
@@ -53,7 +69,12 @@ test.describe('Stage 4 (reveal): tesseract slicing/projection', () => {
     await page.waitForTimeout(500)
 
     const before = await revealState(page)
-    expect(before).toEqual({ revealView: 'slice', revealRotation: 0, revealSliceW0: 0 })
+    expect(before).toEqual({
+      revealView: 'slice',
+      revealRotationXW: 0,
+      revealRotationYW: 0,
+      revealSliceW0: 0,
+    })
 
     // No pointer input at all for a beat — the shader keeps animating (visible in the
     // screenshots below), but the 4D state driving the wireframe's shape must not budge.
@@ -68,14 +89,73 @@ test.describe('Stage 4 (reveal): tesseract slicing/projection', () => {
     await page.waitForTimeout(100)
 
     const afterDrag = await revealState(page)
-    // Both the horizontal (rotation) and vertical (slice offset) drag components did
-    // something, and in the expected directions for a right+up drag.
-    expect(afterDrag.revealRotation).toBeGreaterThan(0)
+    // The unmodified drag's horizontal (xw rotation) and vertical (slice offset)
+    // components both did something, in the expected directions, and left the
+    // Shift-only yw rotation untouched.
+    expect(afterDrag.revealRotationXW).toBeGreaterThan(0)
+    expect(afterDrag.revealRotationYW).toBe(0)
     expect(afterDrag.revealSliceW0).toBeGreaterThan(0)
 
     await page.screenshot({ path: 'e2e/screenshots/reveal-slice-after-drag.png' })
 
     expect(errors).toEqual([])
+  })
+
+  test('Shift+drag rotates in the yw plane instead of xw, leaving xw untouched', async ({
+    page,
+  }) => {
+    const errors: string[] = []
+    page.on('pageerror', (error) => errors.push(error.message))
+
+    await page.goto('/')
+    await page.getByTestId('debug-stage-reveal').click()
+    await page.waitForTimeout(500)
+
+    const center = await canvasCenter(page)
+    await dragFrom(page, center, 150, -80, { shift: true })
+    await page.waitForTimeout(100)
+
+    const afterShiftDrag = await revealState(page)
+    expect(afterShiftDrag.revealRotationXW).toBe(0)
+    expect(afterShiftDrag.revealRotationYW).toBeGreaterThan(0)
+    expect(afterShiftDrag.revealSliceW0).toBeGreaterThan(0)
+
+    expect(errors).toEqual([])
+  })
+
+  test('regression: composing both rotations breaks the "slice is always a box" degeneracy', async ({
+    page,
+  }) => {
+    // xw-rotation alone confines the slicing hyperplane's normal to the x-w plane, so
+    // the cross-section's y/z range is always exactly [-1, 1] no matter the rotation or
+    // slice offset — a real playtest surfaced this as the shape "wobbling" instead of
+    // changing shape. RevealDrag's Shift+drag (yw rotation) is the fix. This test drives
+    // both through the real browser interaction, then feeds the resulting state through
+    // the same math the app itself uses (not a re-derivation) to confirm the fix holds
+    // end to end, not just in fourd.test.ts's isolated unit tests.
+    await page.goto('/')
+    await page.getByTestId('debug-stage-reveal').click()
+    await page.waitForTimeout(500)
+
+    const center = await canvasCenter(page)
+    await dragFrom(page, center, 120, 0)
+    await dragFrom(page, center, 120, 0, { shift: true })
+    await page.waitForTimeout(100)
+
+    const { revealRotationXW, revealRotationYW } = await revealState(page)
+    expect(revealRotationXW).toBeGreaterThan(0)
+    expect(revealRotationYW).toBeGreaterThan(0)
+
+    const rotated = rotateYW(rotateXW(TESSERACT_VERTICES, revealRotationXW), revealRotationYW)
+    const yRangeAt = (w0: number) => {
+      const edges = sliceTesseract(rotated, TESSERACT_FACES, w0)
+      const ys = edges.flatMap((edge) => [edge.a.y, edge.b.y])
+      return ys.length > 0 ? Math.max(...ys) - Math.min(...ys) : 0
+    }
+
+    // With yw rotation contributing, the y-range at two different slice offsets should
+    // actually differ — the fixed "always exactly 2" degeneracy is gone.
+    expect(Math.abs(yRangeAt(0) - yRangeAt(0.6))).toBeGreaterThan(0.1)
   })
 
   test('the view toggle swaps slice/projection without resetting rotation/slice state', async ({

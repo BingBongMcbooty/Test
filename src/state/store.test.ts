@@ -20,7 +20,8 @@ describe('initial state', () => {
   it('starts Stage 4 state at the slice view, no rotation, no slice offset', () => {
     const state = getState()
     expect(state.revealView).toBe('slice')
-    expect(state.revealRotation).toBe(0)
+    expect(state.revealRotationXW).toBe(0)
+    expect(state.revealRotationYW).toBe(0)
     expect(state.revealSliceW0).toBe(0)
   })
 })
@@ -101,13 +102,20 @@ describe('toggleRevealView', () => {
   })
 })
 
-describe('rotateReveal', () => {
+describe('rotateRevealXW / rotateRevealYW', () => {
   it('accumulates rotation across calls, including negative deltas', () => {
-    getState().rotateReveal(0.4)
-    getState().rotateReveal(0.3)
-    expect(getState().revealRotation).toBeCloseTo(0.7)
-    getState().rotateReveal(-0.2)
-    expect(getState().revealRotation).toBeCloseTo(0.5)
+    getState().rotateRevealXW(0.4)
+    getState().rotateRevealXW(0.3)
+    expect(getState().revealRotationXW).toBeCloseTo(0.7)
+    getState().rotateRevealXW(-0.2)
+    expect(getState().revealRotationXW).toBeCloseTo(0.5)
+  })
+
+  it('tracks the two rotation planes independently', () => {
+    getState().rotateRevealXW(0.4)
+    getState().rotateRevealYW(1.1)
+    expect(getState().revealRotationXW).toBeCloseTo(0.4)
+    expect(getState().revealRotationYW).toBeCloseTo(1.1)
   })
 })
 
@@ -132,7 +140,8 @@ describe('reset', () => {
     getState().startDrawing()
     getState().recordAttempt({ success: true, axisContributions: { x: 1, y: 0, z: 0 } })
     getState().toggleRevealView()
-    getState().rotateReveal(1.2)
+    getState().rotateRevealXW(1.2)
+    getState().rotateRevealYW(0.6)
     getState().adjustRevealSlice(0.8)
     getState().reset()
     const state = getState()
@@ -141,7 +150,8 @@ describe('reset', () => {
     expect(state.isDrawing).toBe(false)
     expect(state.lastResult).toBeNull()
     expect(state.revealView).toBe('slice')
-    expect(state.revealRotation).toBe(0)
+    expect(state.revealRotationXW).toBe(0)
+    expect(state.revealRotationYW).toBe(0)
     expect(state.revealSliceW0).toBe(0)
   })
 })

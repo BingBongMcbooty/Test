@@ -6,9 +6,10 @@ import { buildCameraFacingPlane, raycastPointerOntoPlane } from '../math/dragPla
 import { useDimensionsStore } from '../state/store'
 
 /**
- * Radians of xw-plane rotation per world unit of horizontal plane-raycast movement.
- * PLAN.md leaves Stage 4's drag sensitivity as "tune during Task 14's own playtest" —
- * no analytic derivation, just eyeballed against the reveal camera framing.
+ * Radians of rotation per world unit of horizontal plane-raycast movement (shared by
+ * both the xw and yw planes — see `handlePointerDown`). PLAN.md leaves Stage 4's drag
+ * sensitivity as "tune during Task 14's own playtest" — no analytic derivation, just
+ * eyeballed against the reveal camera framing.
  */
 const ROTATION_SENSITIVITY = 1.4
 
@@ -27,22 +28,31 @@ const colliderGeometry = new SphereGeometry(2.2, 12, 12)
  * pass/fail, no arrow ever drawn. It reuses `math/dragPlane.ts`'s camera-facing-plane
  * raycast the same way `ArrowDrag` does (PLAN.md: "the same drag mechanic ...
  * repurposed"), but converts each frame's incremental raycast delta straight into
- * `revealRotation`/`revealSliceW0` updates instead of feeding a `LiveArrow`: the delta's
- * component along the camera's local right axis drives rotation, its component along the
- * camera's local up axis drives the slice offset. Deltas are frame-to-frame (previous hit
- * to current hit), not anchor-relative, so rotation/offset can accumulate past whatever
- * the drag plane's own practical extent is — the same continuous-accumulation feel as
- * orbit controls.
+ * `revealRotationXW`/`revealRotationYW`/`revealSliceW0` updates instead of feeding a
+ * `LiveArrow`. The delta's component along the camera's local up axis always drives the
+ * slice offset; its component along the camera's local right axis drives rotation, in
+ * whichever plane the drag started in — xw normally, yw if Shift was held at
+ * pointer-down (checked once per drag, not live, so releasing Shift mid-drag doesn't
+ * cause a jarring mode switch). Deltas are frame-to-frame (previous hit to current hit),
+ * not anchor-relative, so rotation/offset can accumulate past whatever the drag plane's
+ * own practical extent is — the same continuous-accumulation feel as orbit controls.
  *
- * `math/fourd.ts`'s `rotateYZ` is intentionally never driven here. It's an ordinary 3D
- * rotation entirely within the visible x/y/z axes — `CameraControls`' existing free orbit
- * already gives the player that for free by moving the camera instead. The one rotation
- * actually worth spending the drag on is xw, since it's the only one that moves the shape
- * through the hidden 4th axis the whole stage is about.
+ * A single rotation plane isn't enough here: driving `rotateXW` alone confines the
+ * slice's cutting hyperplane to a normal with no y/z component, so the cross-section is
+ * always a full-extent box (see `rotateYW`'s doc comment in `fourd.ts`) — a real
+ * playtest surfaced this as the shape just "wobbling" instead of changing. The
+ * Shift+drag `rotateYW` control is what actually breaks that degeneracy.
+ *
+ * `math/fourd.ts`'s `rotateYZ` is still intentionally never driven here, unlike
+ * `rotateYW` — it's an ordinary 3D rotation entirely within the visible x/y/z axes, so
+ * unlike `rotateYW` it doesn't touch w at all and can't affect what the slice looks
+ * like; `CameraControls`' existing free orbit already gives the player that same visual
+ * effect for free by moving the camera instead.
  */
 export function RevealDrag() {
   const stage = useDimensionsStore((state) => state.stage)
-  const rotateReveal = useDimensionsStore((state) => state.rotateReveal)
+  const rotateRevealXW = useDimensionsStore((state) => state.rotateRevealXW)
+  const rotateRevealYW = useDimensionsStore((state) => state.rotateRevealYW)
   const adjustRevealSlice = useDimensionsStore((state) => state.adjustRevealSlice)
 
   const camera = useThree((state) => state.camera)
@@ -84,6 +94,7 @@ export function RevealDrag() {
 
     const right = new Vector3().setFromMatrixColumn(camera.matrixWorld, 0)
     const up = new Vector3().setFromMatrixColumn(camera.matrixWorld, 1)
+    const rotate = event.shiftKey ? rotateRevealYW : rotateRevealXW
 
     function onWindowPointerMove(moveEvent: PointerEvent) {
       const plane = dragPlaneRef.current
@@ -95,7 +106,7 @@ export function RevealDrag() {
       if (!hit) return
 
       const delta = hit.clone().sub(previous)
-      rotateReveal(delta.dot(right) * ROTATION_SENSITIVITY)
+      rotate(delta.dot(right) * ROTATION_SENSITIVITY)
       adjustRevealSlice(delta.dot(up) * SLICE_SENSITIVITY)
 
       previousHitRef.current = hit

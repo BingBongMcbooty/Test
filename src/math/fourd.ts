@@ -1,8 +1,8 @@
 /**
- * Pure 4D math for the Stage 4 tesseract: vertex/face/edge generation, the two
- * xw/yz rotation planes, hyperplane slicing, and perspective projection to 3D.
- * No three.js dependency — Task 14's rendering layer converts these plain
- * numbers/objects into `THREE.LineSegments` geometry.
+ * Pure 4D math for the Stage 4 tesseract: vertex/face/edge generation, rotation in the
+ * xw/yz/yw planes, hyperplane slicing, and perspective projection to 3D. No three.js
+ * dependency — Task 14's rendering layer converts these plain numbers/objects into
+ * `THREE.LineSegments` geometry.
  */
 
 /** A point in 4D space, axis order [x, y, z, w]. */
@@ -118,6 +118,27 @@ export function rotateYZ(vertices: readonly Vec4[], angle: number): Vec4[] {
   return vertices.map(([x, y, z, w]) => {
     const [ry, rz] = rotate2D(y, z, angle)
     return [x, ry, rz, w] as Vec4
+  })
+}
+
+/**
+ * Rotates every vertex in the yw-plane by `angle`, leaving x/z untouched.
+ *
+ * This exists for a reason `rotateYZ` doesn't cover: `sliceTesseract`'s cutting
+ * hyperplane is always `w = w0` in whatever frame the vertices are currently in, so its
+ * normal only ever has a nonzero component along an axis that's been mixed with w by
+ * rotation. `rotateXW` alone confines that normal to the x-w plane, which leaves y and z
+ * completely unconstrained by the slice — the cross-section is then always a full-height,
+ * full-depth box (just skewed/resized along x), never a genuinely different polytope.
+ * `rotateYW` mixes w into y too, letting the normal tilt into y and finally break that
+ * "always a box" degeneracy. (`rotateYZ` doesn't help here either — it never touches w at
+ * all, so composing it with `rotateXW` only reorients the same box, per the same
+ * reasoning `RevealDrag.tsx`'s doc comment gives for leaving it undriven.)
+ */
+export function rotateYW(vertices: readonly Vec4[], angle: number): Vec4[] {
+  return vertices.map(([x, y, z, w]) => {
+    const [ry, rw] = rotate2D(y, w, angle)
+    return [x, ry, z, rw] as Vec4
   })
 }
 

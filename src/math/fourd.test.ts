@@ -7,6 +7,7 @@ import {
   type Vec4,
   projectTo3D,
   rotateXW,
+  rotateYW,
   rotateYZ,
   sliceTesseract,
 } from './fourd'
@@ -108,6 +109,26 @@ describe('rotateXW / rotateYZ', () => {
       }
     }
   })
+
+  it('rotateYW leaves x/z untouched and preserves y^2 + w^2', () => {
+    const rotated = rotateYW(TESSERACT_VERTICES, 0.9)
+    for (let i = 0; i < 16; i++) {
+      const [x, y, z, w] = TESSERACT_VERTICES[i]
+      const [rx, ry, rz, rw] = rotated[i]
+      expect(rx).toBeCloseTo(x)
+      expect(rz).toBeCloseTo(z)
+      expect(ry * ry + rw * rw).toBeCloseTo(y * y + w * w)
+    }
+  })
+
+  it('rotateXW then rotateYW composes back to the start after full 2*pi turns', () => {
+    const rotated = rotateYW(rotateXW(TESSERACT_VERTICES, Math.PI * 2), Math.PI * 2)
+    for (let i = 0; i < 16; i++) {
+      for (let axis = 0; axis < 4; axis++) {
+        expect(rotated[i][axis]).toBeCloseTo(TESSERACT_VERTICES[i][axis])
+      }
+    }
+  })
 })
 
 describe('sliceTesseract', () => {
@@ -146,6 +167,43 @@ describe('sliceTesseract', () => {
         expect(Number.isNaN(p.z)).toBe(false)
       }
     }
+  })
+
+  it('rotateXW alone always leaves the slice spanning the full y/z range (the "always a box" degeneracy)', () => {
+    // The slicing hyperplane's normal only ever picks up a component along an axis
+    // that's been mixed with w — rotateXW confines that to x, so y and z stay fully
+    // unconstrained by the slice no matter the rotation angle or offset. This is the
+    // root cause a real playtest surfaced as the reveal stage's cross-section always
+    // "wobbling" instead of changing shape: locked in here so it can't silently
+    // regress back once RevealDrag.tsx's fix (driving rotateYW too) changes.
+    for (const angle of [0.3, 0.9, 1.2]) {
+      const rotated = rotateXW(TESSERACT_VERTICES, angle)
+      const edges = sliceTesseract(rotated, TESSERACT_FACES, 0.4)
+      const ys = edges.flatMap((edge) => [edge.a.y, edge.b.y])
+      const zs = edges.flatMap((edge) => [edge.a.z, edge.b.z])
+      expect(Math.min(...ys)).toBeCloseTo(-1)
+      expect(Math.max(...ys)).toBeCloseTo(1)
+      expect(Math.min(...zs)).toBeCloseTo(-1)
+      expect(Math.max(...zs)).toBeCloseTo(1)
+    }
+  })
+
+  it('composing rotateYW breaks that degeneracy: the slice y-range stops being a fixed +-1 regardless of the slice offset', () => {
+    // With rotateXW alone, the previous test shows the y-range is exactly [-1, 1] no
+    // matter what w0 is — the hyperplane has no y-component to its normal, so slicing
+    // it anywhere never constrains y. Once rotateYW is composed in, the hyperplane's
+    // normal has a real y-component, so *where* you slice (w0) should actually change
+    // the y-range instead of it being a w0-independent constant.
+    const rotated = rotateYW(rotateXW(TESSERACT_VERTICES, 0.3), 0.9)
+    const yRangeAt = (w0: number) => {
+      const edges = sliceTesseract(rotated, TESSERACT_FACES, w0)
+      const ys = edges.flatMap((edge) => [edge.a.y, edge.b.y])
+      return Math.max(...ys) - Math.min(...ys)
+    }
+
+    const rangeA = yRangeAt(0)
+    const rangeB = yRangeAt(0.6)
+    expect(Math.abs(rangeA - rangeB)).toBeGreaterThan(0.1)
   })
 })
 

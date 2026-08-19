@@ -20,10 +20,15 @@ export function RevealControls() {
         left: 0,
         width: '100%',
         display: 'flex',
-        justifyContent: 'center',
+        flexDirection: 'column',
+        alignItems: 'center',
+        gap: '0.6rem',
         fontFamily: 'system-ui, "Segoe UI", Roboto, sans-serif',
       }}
     >
+      <div style={{ fontSize: '0.7rem', letterSpacing: '0.04em', opacity: 0.55, color: '#e5e4e7' }}>
+        drag to rotate · hold shift to rotate the other way · drag vertically to slice
+      </div>
       <button
         type="button"
         data-testid="reveal-view-toggle"

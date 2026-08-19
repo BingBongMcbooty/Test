@@ -7,6 +7,7 @@ import {
   type Point3,
   projectTo3D,
   rotateXW,
+  rotateYW,
   sliceTesseract,
 } from '../../math/fourd'
 import { useDimensionsStore } from '../../state/store'
@@ -35,10 +36,15 @@ function segmentsToPositions(segments: readonly (readonly [Point3, Point3])[]): 
  * Stage 4: the tesseract from `math/fourd.ts` (Task 13), rendered as `THREE.LineSegments`
  * in one of two views — 'slice' (the w=w0 hyperplane cross-section) or 'projection' (the
  * whole shape's perspective 4D->3D shadow) — both read from the same store-held
- * `revealRotation`/`revealSliceW0` (see `RevealDrag.tsx`, the player-driven controller
- * for that state) rather than autoplaying on a timer. Only the xw-plane rotation is
- * driven by player input this task — see `RevealDrag.tsx`'s doc comment for why yz
- * rotation is deliberately left to the camera's own free orbit instead.
+ * `revealRotationXW`/`revealRotationYW`/`revealSliceW0` (see `RevealDrag.tsx`, the
+ * player-driven controller for that state) rather than autoplaying on a timer.
+ *
+ * Both `rotateXW` and `rotateYW` are composed in (in that order) — a single rotation
+ * plane isn't enough for the slice view to show real variety: see `rotateYW`'s doc
+ * comment in `fourd.ts` for why xw-only rotation always leaves the cross-section as a
+ * full-extent box no matter the angle, which is what a real playtest surfaced as
+ * "wobbling" rather than genuinely changing shape. `rotateYZ` is still never driven —
+ * see `RevealDrag.tsx`'s doc comment for why that one's redundant with camera orbit.
  *
  * A fresh `BufferGeometry` is built on every relevant state change rather than mutating
  * one in place — the slice view's vertex count varies frame to frame (0 to 24 points
@@ -49,12 +55,13 @@ function segmentsToPositions(segments: readonly (readonly [Point3, Point3])[]): 
  */
 export function RevealStage() {
   const revealView = useDimensionsStore((state) => state.revealView)
-  const revealRotation = useDimensionsStore((state) => state.revealRotation)
+  const revealRotationXW = useDimensionsStore((state) => state.revealRotationXW)
+  const revealRotationYW = useDimensionsStore((state) => state.revealRotationYW)
   const revealSliceW0 = useDimensionsStore((state) => state.revealSliceW0)
   const material = useTesseractLineMaterial()
 
   const geometry = useMemo(() => {
-    const rotated = rotateXW(TESSERACT_VERTICES, revealRotation)
+    const rotated = rotateYW(rotateXW(TESSERACT_VERTICES, revealRotationXW), revealRotationYW)
     const geo = new BufferGeometry()
 
     const segments: [Point3, Point3][] =
@@ -67,7 +74,7 @@ export function RevealStage() {
 
     geo.setAttribute('position', new Float32BufferAttribute(segmentsToPositions(segments), 3))
     return geo
-  }, [revealView, revealRotation, revealSliceW0])
+  }, [revealView, revealRotationXW, revealRotationYW, revealSliceW0])
 
   useEffect(() => {
     return () => geometry.dispose()

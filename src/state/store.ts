@@ -8,8 +8,15 @@ interface DimensionsState {
   isDrawing: boolean
   lastResult: AttemptResult | null
   revealView: RevealView
-  /** xw-plane rotation angle (radians) driving Stage 4's tesseract — see RevealDrag.tsx. */
-  revealRotation: number
+  /**
+   * xw-plane rotation angle (radians) — the default drag rotation, see RevealDrag.tsx.
+   * Rotating only in this one plane keeps the slice hyperplane's normal confined to x,
+   * which leaves y/z totally unconstrained by the slice (always a full-extent box) —
+   * see `revealRotationYW`, which is what actually breaks that degeneracy.
+   */
+  revealRotationXW: number
+  /** yw-plane rotation angle (radians) — the Shift+drag rotation, see RevealDrag.tsx. */
+  revealRotationYW: number
   /** Stage 4's hyperplane slice offset, clamped to +-REVEAL_SLICE_RANGE. */
   revealSliceW0: number
 
@@ -19,7 +26,8 @@ interface DimensionsState {
   endDrawing: () => void
   recordAttempt: (result: AttemptResult) => void
   toggleRevealView: () => void
-  rotateReveal: (deltaAngle: number) => void
+  rotateRevealXW: (deltaAngle: number) => void
+  rotateRevealYW: (deltaAngle: number) => void
   adjustRevealSlice: (delta: number) => void
   reset: () => void
 }
@@ -30,7 +38,8 @@ const initialState = {
   isDrawing: false,
   lastResult: null as AttemptResult | null,
   revealView: 'slice' as RevealView,
-  revealRotation: 0,
+  revealRotationXW: 0,
+  revealRotationYW: 0,
   revealSliceW0: 0,
 }
 
@@ -65,8 +74,11 @@ export const useDimensionsStore = create<DimensionsState>((set) => ({
   toggleRevealView: () =>
     set((state) => ({ revealView: state.revealView === 'slice' ? 'projection' : 'slice' })),
 
-  rotateReveal: (deltaAngle) =>
-    set((state) => ({ revealRotation: state.revealRotation + deltaAngle })),
+  rotateRevealXW: (deltaAngle) =>
+    set((state) => ({ revealRotationXW: state.revealRotationXW + deltaAngle })),
+
+  rotateRevealYW: (deltaAngle) =>
+    set((state) => ({ revealRotationYW: state.revealRotationYW + deltaAngle })),
 
   adjustRevealSlice: (delta) =>
     set((state) => ({
