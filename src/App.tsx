@@ -2,6 +2,7 @@ import { Experience } from './scene/Experience'
 import { CubeFeedback } from './ui/CubeFeedback'
 import { DebugStageControls } from './ui/DebugStageControls'
 import { HUD } from './ui/HUD'
+import { RevealControls } from './ui/RevealControls'
 
 function App() {
   return (
@@ -9,6 +10,7 @@ function App() {
       <Experience />
       <HUD />
       <CubeFeedback />
+      <RevealControls />
       <DebugStageControls />
     </div>
   )

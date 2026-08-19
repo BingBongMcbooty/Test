@@ -1,18 +1,26 @@
 import { create } from 'zustand'
 import type { AttemptResult } from '../math/validation'
-import { type Stage, nextStage } from './stageConfig'
+import { REVEAL_SLICE_RANGE, type RevealView, type Stage, nextStage } from './stageConfig'
 
 interface DimensionsState {
   stage: Stage
   attempts: number
   isDrawing: boolean
   lastResult: AttemptResult | null
+  revealView: RevealView
+  /** xw-plane rotation angle (radians) driving Stage 4's tesseract — see RevealDrag.tsx. */
+  revealRotation: number
+  /** Stage 4's hyperplane slice offset, clamped to +-REVEAL_SLICE_RANGE. */
+  revealSliceW0: number
 
   setStage: (stage: Stage) => void
   advanceStage: () => void
   startDrawing: () => void
   endDrawing: () => void
   recordAttempt: (result: AttemptResult) => void
+  toggleRevealView: () => void
+  rotateReveal: (deltaAngle: number) => void
+  adjustRevealSlice: (delta: number) => void
   reset: () => void
 }
 
@@ -21,6 +29,13 @@ const initialState = {
   attempts: 0,
   isDrawing: false,
   lastResult: null as AttemptResult | null,
+  revealView: 'slice' as RevealView,
+  revealRotation: 0,
+  revealSliceW0: 0,
+}
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, value))
 }
 
 export const useDimensionsStore = create<DimensionsState>((set) => ({
@@ -47,5 +62,29 @@ export const useDimensionsStore = create<DimensionsState>((set) => ({
       isDrawing: false,
     })),
 
+  toggleRevealView: () =>
+    set((state) => ({ revealView: state.revealView === 'slice' ? 'projection' : 'slice' })),
+
+  rotateReveal: (deltaAngle) =>
+    set((state) => ({ revealRotation: state.revealRotation + deltaAngle })),
+
+  adjustRevealSlice: (delta) =>
+    set((state) => ({
+      revealSliceW0: clamp(state.revealSliceW0 + delta, -REVEAL_SLICE_RANGE, REVEAL_SLICE_RANGE),
+    })),
+
   reset: () => set({ ...initialState }),
 }))
+
+// Dev-only escape hatch so e2e tests can read exact store state (e.g. confirming
+// revealRotation/revealSliceW0 genuinely hold still with no pointer input, or that
+// toggling revealView leaves them untouched) instead of inferring it from animated-
+// shader canvas pixels — RevealStage's material intentionally never sits still (Task
+// 7's visual escalation), which makes screenshot-diff magnitude an unreliable proxy for
+// "did the underlying 4D state change." `import.meta.env.DEV` is statically false in
+// `vite build`, so this is dead code eliminated from the shipped bundle — same spirit as
+// `DebugStageControls.tsx`'s test-support scaffolding, just for state instead of stage
+// navigation.
+if (import.meta.env.DEV) {
+  Object.assign(window, { __dimensionsStore: useDimensionsStore })
+}

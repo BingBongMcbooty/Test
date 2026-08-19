@@ -3,11 +3,13 @@ import { CameraControls, type CameraControlsImpl } from '@react-three/drei'
 import { useEffect, useRef } from 'react'
 import { useDimensionsStore } from '../state/store'
 import { ArrowDrag } from './ArrowDrag'
+import { RevealDrag } from './RevealDrag'
 import { CAMERA_FRAMING } from './cameraFraming'
 import { LIGHT_RIG } from './materials'
 import { CubeStage } from './stages/CubeStage'
 import { LineStage } from './stages/LineStage'
 import { PlaneStage } from './stages/PlaneStage'
+import { RevealStage } from './stages/RevealStage'
 
 function StageGeometry() {
   const stage = useDimensionsStore((state) => state.stage)
@@ -19,7 +21,9 @@ function StageGeometry() {
       return <PlaneStage />
     case 'cube':
       return <CubeStage />
-    // 'reveal' and 'closing' get their own scenes in Tasks 13/14.
+    case 'reveal':
+      return <RevealStage />
+    // 'closing' gets its own scene in Task 15.
     default:
       return null
   }
@@ -87,6 +91,7 @@ export function Experience() {
       <StageGeometry />
       <CameraRig />
       <ArrowDrag />
+      <RevealDrag />
     </Canvas>
   )
 }

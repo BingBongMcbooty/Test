@@ -16,6 +16,13 @@ describe('initial state', () => {
     expect(state.isDrawing).toBe(false)
     expect(state.lastResult).toBeNull()
   })
+
+  it('starts Stage 4 state at the slice view, no rotation, no slice offset', () => {
+    const state = getState()
+    expect(state.revealView).toBe('slice')
+    expect(state.revealRotation).toBe(0)
+    expect(state.revealSliceW0).toBe(0)
+  })
 })
 
 describe('setStage', () => {
@@ -84,16 +91,57 @@ describe('recordAttempt', () => {
   })
 })
 
+describe('toggleRevealView', () => {
+  it('flips between slice and projection', () => {
+    expect(getState().revealView).toBe('slice')
+    getState().toggleRevealView()
+    expect(getState().revealView).toBe('projection')
+    getState().toggleRevealView()
+    expect(getState().revealView).toBe('slice')
+  })
+})
+
+describe('rotateReveal', () => {
+  it('accumulates rotation across calls, including negative deltas', () => {
+    getState().rotateReveal(0.4)
+    getState().rotateReveal(0.3)
+    expect(getState().revealRotation).toBeCloseTo(0.7)
+    getState().rotateReveal(-0.2)
+    expect(getState().revealRotation).toBeCloseTo(0.5)
+  })
+})
+
+describe('adjustRevealSlice', () => {
+  it('accumulates the slice offset across calls', () => {
+    getState().adjustRevealSlice(0.3)
+    getState().adjustRevealSlice(0.2)
+    expect(getState().revealSliceW0).toBeCloseTo(0.5)
+  })
+
+  it('clamps to +-REVEAL_SLICE_RANGE instead of drifting past it', () => {
+    getState().adjustRevealSlice(10)
+    expect(getState().revealSliceW0).toBe(1.5)
+    getState().adjustRevealSlice(-10)
+    expect(getState().revealSliceW0).toBe(-1.5)
+  })
+})
+
 describe('reset', () => {
   it('restores initial state from anywhere', () => {
     getState().setStage('reveal')
     getState().startDrawing()
     getState().recordAttempt({ success: true, axisContributions: { x: 1, y: 0, z: 0 } })
+    getState().toggleRevealView()
+    getState().rotateReveal(1.2)
+    getState().adjustRevealSlice(0.8)
     getState().reset()
     const state = getState()
     expect(state.stage).toBe('line')
     expect(state.attempts).toBe(0)
     expect(state.isDrawing).toBe(false)
     expect(state.lastResult).toBeNull()
+    expect(state.revealView).toBe('slice')
+    expect(state.revealRotation).toBe(0)
+    expect(state.revealSliceW0).toBe(0)
   })
 })

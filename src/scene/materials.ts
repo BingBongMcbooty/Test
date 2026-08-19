@@ -226,6 +226,55 @@ export function usePlaneFillMaterial() {
   }, [])
 }
 
+// Reveal stage (Task 14): the tesseract renders as bare `THREE.LineSegments` (no faces
+// to light), so it can't reuse `richnessVertexShader`'s normal-dependent lighting/
+// fresnel terms the way the cube/plane fills do — there's no meaningful normal on a
+// line. Extending Task 7's visual system here means carrying over its animated
+// procedural noise (the same `fbm`/`uTime` machinery) as a slow color drift between two
+// cool tones, rather than reverting to a flat unlit `lineBasicMaterial` the way Stage 1
+// stayed. A dedicated minimal vertex shader (position only, no normal) replaces
+// `richnessVertexShader` for this one material.
+const tesseractLineVertexShader = /* glsl */ `
+  varying vec3 vWorldPosition;
+
+  void main() {
+    vec4 worldPosition = modelMatrix * vec4(position, 1.0);
+    vWorldPosition = worldPosition.xyz;
+    gl_Position = projectionMatrix * viewMatrix * worldPosition;
+  }
+`
+
+const tesseractLineFragmentShader = /* glsl */ `
+  ${noiseGLSL}
+
+  uniform float uTime;
+  uniform vec3 uBaseColor;
+  uniform vec3 uRimColor;
+
+  varying vec3 vWorldPosition;
+
+  void main() {
+    float n = fbm(vWorldPosition * 1.3 + uTime * 0.2);
+    vec3 color = mix(uBaseColor, uRimColor, n);
+    gl_FragColor = vec4(color, 1.0);
+  }
+`
+
+export function useTesseractLineMaterial() {
+  return useMemo(() => {
+    const material = new ShaderMaterial({
+      uniforms: {
+        uTime: { value: 0 },
+        uBaseColor: { value: new Color('#7d7cc4') },
+        uRimColor: { value: new Color('#b6a6ff') },
+      },
+      vertexShader: tesseractLineVertexShader,
+      fragmentShader: tesseractLineFragmentShader,
+    })
+    return withTimeUniform(material)
+  }, [])
+}
+
 // Arrow (Task 9): the player's live-drawn arrow needs a hue distinct from the shape it's
 // drawn against (warm gold vs. the shapes' cool indigo/violet), but the same "don't have
 // one fixed look" rule from Task 7 still applies to it. `uRichness` fades the fresnel rim
