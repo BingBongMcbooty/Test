@@ -33,6 +33,14 @@ export const STAGE_CONFIG: Record<Stage, StageConfig> = {
   },
 }
 
+/**
+ * Stage 3 always fails `evaluateAttempt` (its occupiedAxes is all of x/y/z, so the
+ * leftover is structurally the zero vector — see validation.ts) — this is the count of
+ * such attempts before the app moves the player on to `reveal` regardless. PLAN.md's
+ * tunable, "start with N=3."
+ */
+export const CUBE_ATTEMPTS_BEFORE_REVEAL = 3
+
 export function nextStage(stage: Stage): Stage {
   const index = STAGE_ORDER.indexOf(stage)
   return STAGE_ORDER[Math.min(index + 1, STAGE_ORDER.length - 1)]

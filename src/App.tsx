@@ -1,4 +1,5 @@
 import { Experience } from './scene/Experience'
+import { CubeFeedback } from './ui/CubeFeedback'
 import { DebugStageControls } from './ui/DebugStageControls'
 import { HUD } from './ui/HUD'
 
@@ -7,6 +8,7 @@ function App() {
     <div style={{ position: 'relative', width: '100%', height: '100%' }}>
       <Experience />
       <HUD />
+      <CubeFeedback />
       <DebugStageControls />
     </div>
   )
