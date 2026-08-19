@@ -20,7 +20,7 @@ Status legend: ⬜ not started · 🔶 in progress · ✅ done
 - ✅ Task 11 — Validation wiring for Stages 1 & 2 — `claude/validation-wiring-stages-1-2-b9nq6a` @ `601f192`, merged to default
 
 ## Stage 3 *(new session)*
-- ✅ Task 12 — Stage 3 (cube) + decomposition feedback — `claude/stage-3-cube-decomposition-wtq674` @ (pending commit below), merged to default
+- ✅ Task 12 — Stage 3 (cube) + decomposition feedback — `claude/stage-3-cube-decomposition-wtq674` @ `67498bd`, merged to default
 
 ## Stage 4 *(new session)*
 - ⬜ Task 13 — 4D math core
