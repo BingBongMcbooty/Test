@@ -75,29 +75,62 @@ test.describe('pointer/drag controller', () => {
     expect(errors).toEqual([])
   })
 
-  test('a drag starting off the object orbits the camera instead of drawing', async ({ page }) => {
+  test('a drag starting off the object does nothing — no arrow, no camera movement', async ({
+    page,
+  }) => {
     const errors: string[] = []
     page.on('pageerror', (error) => errors.push(error.message))
 
     await page.goto('/')
     await expect(page.locator('canvas')).toBeVisible()
-    // Orbit only unlocks from Stage 3 (cube) on — see cameraFraming.ts's
-    // `orbitEnabled` note. This test is specifically about the off-object-orbits/
-    // on-object-draws distinction, which needs a stage where orbit actually exists.
+    // Cube stage still has real camera movement available (via Task 17's buttons), so
+    // this confirms an off-object drag specifically never reaches it, on a stage where
+    // it plausibly could if the old drag-to-orbit fallback still existed.
     await page.getByTestId('debug-stage-cube').click()
-    await page.waitForTimeout(300)
 
-    const atRest = await canvasSnapshot(page)
+    // The cube's shader material animates on its own (Task 7's noise/fresnel), so a
+    // canvas-pixel comparison can't distinguish "camera did nothing" from "camera did
+    // something too subtle to see" — exact camera state is what actually proves it,
+    // same lesson orbit.spec.ts's `getCameraState` helper documents. The stage-change
+    // camera transition is animated (Task 11), so poll until two consecutive reads
+    // match before trusting either as "before" — see orbit.spec.ts's identical
+    // `waitForCameraSettled` reasoning.
+    const readCameraState = () =>
+      page.evaluate(() => {
+        const c = (window as unknown as { __cameraControls: { azimuthAngle: number; polarAngle: number; distance: number } }).__cameraControls
+        return { azimuthAngle: c.azimuthAngle, polarAngle: c.polarAngle, distance: c.distance }
+      })
+    async function waitForSettled() {
+      // Poll for `window.__cameraControls` to exist before the first read — right after
+      // a stage-changing click, `Experience.tsx`'s `CameraRig` mount-time `useEffect`
+      // may not have run yet (a genuine race, not just a slow transition). Same
+      // pre-existing flake orbit.spec.ts's `waitForCameraControls` documents.
+      await expect
+        .poll(() =>
+          page.evaluate(() => Boolean((window as unknown as { __cameraControls?: unknown }).__cameraControls)),
+        )
+        .toBe(true)
+      let previous = await readCameraState()
+      for (let attempt = 0; attempt < 20; attempt++) {
+        await page.waitForTimeout(150)
+        const current = await readCameraState()
+        if (JSON.stringify(current) === JSON.stringify(previous)) return current
+        previous = current
+      }
+      throw new Error('camera never settled')
+    }
+    const before = await waitForSettled()
 
     const corner = await canvasCorner(page)
     await dragFrom(page, corner, 300, 100)
     await page.mouse.up()
     await page.waitForTimeout(500)
 
-    const afterRelease = await canvasSnapshot(page)
-    await page.screenshot({ path: 'e2e/screenshots/arrow-drag-line-orbit-instead.png' })
-    // The camera actually moved (orbit engaged) rather than staying put with an arrow.
-    expect(afterRelease).not.toEqual(atRest)
+    const after = await readCameraState()
+    await page.screenshot({ path: 'e2e/screenshots/arrow-drag-cube-off-object-inert.png' })
+    // Task 17: mouse-drag never orbits the camera anywhere — the camera state is
+    // untouched by an off-object drag, regardless of stage.
+    expect(after).toEqual(before)
 
     expect(errors).toEqual([])
   })
@@ -118,15 +151,18 @@ test.describe('pointer/drag controller', () => {
     await page.mouse.up()
     await page.waitForTimeout(300)
 
-    // Orbit to a different angle (drag starts off-object), then draw again from the new
-    // angle to confirm legibility isn't a one-angle fluke.
-    const corner = await canvasCorner(page)
-    await dragFrom(page, corner, -350, 150)
-    await page.mouse.up()
+    // Rotate to a different angle via Task 17's on-screen buttons (mouse-drag no
+    // longer orbits anywhere), then draw again from the new angle to confirm
+    // legibility isn't a one-angle fluke. The shape stays camera-target-locked, so
+    // canvas center is still "on the object" after rotating.
+    for (let i = 0; i < 5; i++) {
+      await page.getByTestId('camera-control-right').click()
+      await page.waitForTimeout(60)
+    }
     await page.waitForTimeout(500)
 
-    const centerAfterOrbit = await canvasCenter(page)
-    await dragFrom(page, centerAfterOrbit, -120, 100)
+    const centerAfterRotate = await canvasCenter(page)
+    await dragFrom(page, centerAfterRotate, -120, 100)
     await page.screenshot({ path: 'e2e/screenshots/arrow-drag-cube-angle-2.png' })
     await page.mouse.up()
     await page.waitForTimeout(300)

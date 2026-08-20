@@ -1,11 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useThree, type ThreeEvent } from '@react-three/fiber'
-import type { CameraControlsImpl } from '@react-three/drei'
 import { BoxGeometry, CylinderGeometry, DoubleSide, PlaneGeometry, Plane, Raycaster, Vector2, Vector3 } from 'three'
 import { useDimensionsStore } from '../state/store'
 import { buildCameraFacingPlane, raycastPointerOntoPlane } from '../math/dragPlane'
 import { evaluateAttempt } from '../math/validation'
-import { CAMERA_FRAMING } from './cameraFraming'
 import { SHAPE_POSITION } from './shapePositions'
 import { STAGE_CONFIG } from '../state/stageConfig'
 import { FAIL_CUE_DURATION, FailCueArrow } from './FailCueArrow'
@@ -36,12 +34,13 @@ interface LiveDrag {
 }
 
 /**
- * Pointer-down hit-tests the current stage's collider; a hit enters draw mode (disables
- * `CameraControls` for the duration, per PLAN.md) and feeds `LiveArrow` from Task 8's
- * camera-facing-plane raycast on every pointer-move, restoring orbit on pointer-up. A
- * miss does nothing, leaving `CameraControls`' own listeners to handle the orbit as
- * usual. Per CLAUDE.md, the live drag's points stay local component state — only the
- * `isDrawing` flag (a store concern since Task 3) is shared globally.
+ * Pointer-down hit-tests the current stage's collider; a hit enters draw mode, feeding
+ * `LiveArrow` from Task 8's camera-facing-plane raycast on every pointer-move. A miss
+ * does nothing — `CameraControls`' own drag-to-orbit no longer exists anywhere (Task
+ * 17: `enabled={false}` permanently in `Experience.tsx`'s `CameraRig`), so an off-object
+ * drag is simply inert rather than orbiting the camera. Per CLAUDE.md, the live drag's
+ * points stay local component state — only the `isDrawing` flag (a store concern since
+ * Task 3) is shared globally.
  *
  * Task 11: on pointer-up, a drag that cleared the dead zone is handed to
  * `evaluateAttempt` (`math/validation.ts`) against the current stage's occupied axes.
@@ -58,7 +57,6 @@ export function ArrowDrag() {
 
   const camera = useThree((state) => state.camera)
   const gl = useThree((state) => state.gl)
-  const controlsFromStore = useThree((state) => state.controls) as CameraControlsImpl | null
 
   const [liveDrag, setLiveDrag] = useState<LiveDrag | null>(null)
   const [failCue, setFailCue] = useState<LiveDrag | null>(null)
@@ -68,15 +66,6 @@ export function ArrowDrag() {
   const dragEndRef = useRef<Vector3 | null>(null)
   const cleanupRef = useRef<(() => void) | null>(null)
   const failCueTimeoutRef = useRef<number | null>(null)
-  // `CameraControls` (drei's `makeDefault`-registered instance) is an external,
-  // intentionally-mutable object — mirrored into a plain ref (rather than toggling
-  // `.enabled` on the `useThree()`-selected value directly) since the compiler-based
-  // react-hooks/immutability rule treats a hook's return value as frozen outside its
-  // own factory, the same rule Task 7/9's material notes work around for `ShaderMaterial`.
-  const controlsRef = useRef<CameraControlsImpl | null>(null)
-  useEffect(() => {
-    controlsRef.current = controlsFromStore
-  }, [controlsFromStore])
 
   useEffect(() => {
     return () => {
@@ -107,7 +96,6 @@ export function ArrowDrag() {
     dragStartRef.current = anchor
     dragEndRef.current = anchor
 
-    if (controlsRef.current) controlsRef.current.enabled = false
     startDrawing()
 
     function onWindowPointerMove(moveEvent: PointerEvent) {
@@ -133,12 +121,6 @@ export function ArrowDrag() {
     function onWindowPointerUp() {
       cleanupRef.current?.()
       cleanupRef.current = null
-      // Restore to this stage's own orbit-lock state, not unconditionally `true` — on
-      // Stages 1-2 that would silently re-enable the free orbit `cameraFraming.ts`'s
-      // `orbitEnabled: false` is meant to keep off. A successful drag changes `stage`
-      // right after this, at which point `Experience.tsx`'s `CameraRig` effect applies
-      // the new stage's own setting anyway; this matters for the stay-on-stage (fail) case.
-      if (controlsRef.current) controlsRef.current.enabled = CAMERA_FRAMING[stage].orbitEnabled
       endDrawing()
 
       const start = dragStartRef.current

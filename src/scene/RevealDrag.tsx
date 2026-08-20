@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useRef } from 'react'
 import { useThree, type ThreeEvent } from '@react-three/fiber'
-import type { CameraControlsImpl } from '@react-three/drei'
 import { Plane, Raycaster, SphereGeometry, Vector2, Vector3 } from 'three'
 import { buildCameraFacingPlane, raycastPointerOntoPlane } from '../math/dragPlane'
 import { useDimensionsStore } from '../state/store'
@@ -46,8 +45,13 @@ const colliderGeometry = new SphereGeometry(2.2, 12, 12)
  * `math/fourd.ts`'s `rotateYZ` is still intentionally never driven here, unlike
  * `rotateYW` — it's an ordinary 3D rotation entirely within the visible x/y/z axes, so
  * unlike `rotateYW` it doesn't touch w at all and can't affect what the slice looks
- * like; `CameraControls`' existing free orbit already gives the player that same visual
- * effect for free by moving the camera instead.
+ * like; `ui/CameraDirectionalControls.tsx`'s on-screen camera buttons (Task 17) already
+ * give the player that same visual effect by moving the camera itself instead.
+ *
+ * Task 17: this drag no longer needs to disable `CameraControls` for its duration —
+ * `CameraControls.enabled` is permanently `false` now (`Experience.tsx`'s `CameraRig`),
+ * so there's nothing left here to fight over with mouse-drag orbit, which no longer
+ * exists.
  */
 export function RevealDrag() {
   const stage = useDimensionsStore((state) => state.stage)
@@ -57,19 +61,11 @@ export function RevealDrag() {
 
   const camera = useThree((state) => state.camera)
   const gl = useThree((state) => state.gl)
-  const controlsFromStore = useThree((state) => state.controls) as CameraControlsImpl | null
 
   const raycaster = useMemo(() => new Raycaster(), [])
   const dragPlaneRef = useRef<Plane | null>(null)
   const previousHitRef = useRef<Vector3 | null>(null)
   const cleanupRef = useRef<(() => void) | null>(null)
-  // Same ref-mirroring workaround as ArrowDrag.tsx: mutating `.enabled` on the
-  // `useThree()`-selected controls value directly trips the compiler-based
-  // react-hooks immutability check.
-  const controlsRef = useRef<CameraControlsImpl | null>(null)
-  useEffect(() => {
-    controlsRef.current = controlsFromStore
-  }, [controlsFromStore])
 
   useEffect(() => {
     return () => cleanupRef.current?.()
@@ -89,8 +85,6 @@ export function RevealDrag() {
     const anchor = event.point.clone()
     dragPlaneRef.current = buildCameraFacingPlane(anchor, camera)
     previousHitRef.current = anchor
-
-    if (controlsRef.current) controlsRef.current.enabled = false
 
     const right = new Vector3().setFromMatrixColumn(camera.matrixWorld, 0)
     const up = new Vector3().setFromMatrixColumn(camera.matrixWorld, 1)
@@ -115,7 +109,6 @@ export function RevealDrag() {
     function onWindowPointerUp() {
       cleanupRef.current?.()
       cleanupRef.current = null
-      if (controlsRef.current) controlsRef.current.enabled = true
       dragPlaneRef.current = null
       previousHitRef.current = null
     }

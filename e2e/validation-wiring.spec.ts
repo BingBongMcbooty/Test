@@ -38,14 +38,27 @@ async function dragFrom(page: Page, from: CanvasPoint, dx: number, dy: number) {
 const LINE_PASS_DELTA = { dx: 0, dy: -200 }
 const LINE_FAIL_DELTA = { dx: 200, dy: 0 }
 
-// Plane stage (occupiedAxes=['x','y']): the achievable orthogonality ratio from any
-// straight screen-space drag tops out around ~0.715 near this angle — this camera
-// framing (`CAMERA_FRAMING.plane`) doesn't give a drag much more than the 0.7
-// threshold's worth of "pure z" to work with, so this is close to the best case
-// rather than a comfortably-clear pass. Worth retuning `CAMERA_FRAMING.plane` in a
-// later polish pass if this ever reads as too strict in practice; out of scope here.
-const PLANE_PASS_DELTA = { dx: 217, dy: -125 }
+// Plane stage (occupiedAxes=['x','y']): Task 17 moved Stage 2's resting camera to
+// dead-on (azimuth 0, polar pi/2) — at that exact angle the camera-facing drag plane
+// *is* the z=0 plane, so z is mathematically unreachable by any straight screen drag at
+// all (ratio is exactly 0, not just low). The player has to press the on-screen "rotate
+// right" button first to tilt the camera away from dead-on — `PLANE_TILT_RANGE = 1.0`
+// rad (cameraFraming.ts) was chosen empirically as the smallest tilt with a comfortable
+// (not razor's-edge) margin above `ORTHOGONALITY_THRESHOLD = 0.7`; see that constant's
+// own doc comment and PROGRESS.md's Task 17 notes for the sweep. `ROTATE_STEP = 0.35`
+// rad/click (`CameraDirectionalControls.tsx`), so 3 clicks (1.05 rad requested) clamps
+// to exactly `PLANE_TILT_RANGE`.
+const PLANE_TILT_CLICKS = 3
+const PLANE_PASS_DELTA = { dx: 100, dy: 0 }
 const PLANE_FAIL_DELTA = { dx: 0, dy: -200 }
+
+async function tiltPlaneCamera(page: Page) {
+  for (let i = 0; i < PLANE_TILT_CLICKS; i++) {
+    await page.getByTestId('camera-control-right').click()
+    await page.waitForTimeout(60)
+  }
+  await page.waitForTimeout(400)
+}
 
 test.describe('validation wiring (Stages 1 & 2)', () => {
   test('a roughly-orthogonal drag on Stage 1 advances to Stage 2 with an animated camera transition', async ({
@@ -126,6 +139,10 @@ test.describe('validation wiring (Stages 1 & 2)', () => {
     await page.waitForTimeout(600)
     await expect(page.getByText('PLANE', { exact: true })).toBeVisible()
 
+    // Stage 2 rests dead-on (Task 17) — z is unreachable there at all, so the player
+    // has to tilt via the on-screen button first before any drag can leave the plane.
+    await tiltPlaneCamera(page)
+
     const center = await canvasCenter(page)
     await dragFrom(page, center, PLANE_PASS_DELTA.dx, PLANE_PASS_DELTA.dy)
 
@@ -144,6 +161,10 @@ test.describe('validation wiring (Stages 1 & 2)', () => {
     await page.getByTestId('debug-stage-plane').click()
     await page.waitForTimeout(600)
 
+    // Tilt first, matching real play (see the pass test above) — captured as "at rest"
+    // only after the tilt itself has settled, so the fail cue's pixel diff isn't
+    // confused with the tilt transition's own.
+    await tiltPlaneCamera(page)
     const atRest = await canvasSnapshot(page)
 
     const center = await canvasCenter(page)

@@ -6,6 +6,7 @@ import { ArrowDrag } from './ArrowDrag'
 import { Grid } from './Grid'
 import { RevealDrag } from './RevealDrag'
 import { CAMERA_FRAMING } from './cameraFraming'
+import { cameraControlsRef } from './cameraControlsRef'
 import { LIGHT_RIG } from './materials'
 import { CubeStage } from './stages/CubeStage'
 import { LineStage } from './stages/LineStage'
@@ -61,9 +62,10 @@ function CameraRig() {
   const controlsRef = useRef<CameraControlsImpl>(null)
   const stage = useDimensionsStore((state) => state.stage)
   const hasMountedRef = useRef(false)
+  const framing = CAMERA_FRAMING[stage]
 
   useEffect(() => {
-    const { position, target, orbitEnabled } = CAMERA_FRAMING[stage]
+    const { position, target } = framing
     // `true` enables camera-controls' own smoothed transition — Task 5 cut this in as
     // an instant `setLookAt(..., false)`; Task 11 is where stage-advance actually
     // happens via player interaction, so the cut is replaced with a real transition.
@@ -76,11 +78,7 @@ function CameraRig() {
     // on being fully resolved. An instant cut on mount only, real transitions after.
     controlsRef.current?.setLookAt(...position, ...target, hasMountedRef.current)
     hasMountedRef.current = true
-    // `.enabled` only gates the library's own pointer listeners (drag-to-orbit/zoom),
-    // not this programmatic `setLookAt` call above — see `orbitEnabled`'s doc comment
-    // in cameraFraming.ts for why Stages 1-2 lock this off.
-    if (controlsRef.current) controlsRef.current.enabled = orbitEnabled
-  }, [stage])
+  }, [stage, framing])
 
   // Dev-only escape hatch, same spirit as store.ts's `window.__dimensionsStore` (Task
   // 14's note): lets e2e tests assert the camera's actual azimuth/polar/distance
@@ -96,17 +94,33 @@ function CameraRig() {
     }
   }, [])
 
+  // Task 17: `cameraControlsRef` mirrors this same instance out to
+  // `ui/CameraDirectionalControls.tsx`, a plain DOM overlay outside the R3F `Canvas`
+  // that drives `.rotate()`/`.dolly()` from button clicks — the production equivalent
+  // of the dev-only `window.__cameraControls` hook above, needed there because it isn't
+  // dev-only.
+  useEffect(() => {
+    cameraControlsRef.current = controlsRef.current
+  }, [])
+
   return (
     <CameraControls
       ref={controlsRef}
       makeDefault
-      // Explicit full-orbit range (these happen to match camera-controls' own
-      // defaults, but declared rather than left implicit): nothing in this scene is
-      // grounded, so there's no "floor" to stop the player orbiting under or over.
-      minPolarAngle={0}
-      maxPolarAngle={Math.PI}
-      minAzimuthAngle={-Infinity}
-      maxAzimuthAngle={Infinity}
+      // Task 17: mouse-drag never orbits the camera anywhere anymore — permanently
+      // disabling `CameraControls`' own pointer/wheel listeners is what makes a drag
+      // mean exactly one thing everywhere it's available ("point," never "orbit"),
+      // regardless of where on the canvas it starts. Camera movement instead comes
+      // entirely from `ui/CameraDirectionalControls.tsx`'s buttons calling `.rotate()`/
+      // `.dolly()` imperatively, which `.enabled` doesn't gate.
+      enabled={false}
+      // Per-stage azimuth/polar bounds (`cameraFraming.ts`): Stage 1 never renders the
+      // buttons at all so its full range is moot; Stage 2 gets `PLANE_TILT_RANGE`'s
+      // limited tilt; Stage 3 on gets the original unclamped full range.
+      minPolarAngle={framing.polarRange?.[0] ?? 0}
+      maxPolarAngle={framing.polarRange?.[1] ?? Math.PI}
+      minAzimuthAngle={framing.azimuthRange?.[0] ?? -Infinity}
+      maxAzimuthAngle={framing.azimuthRange?.[1] ?? Infinity}
     />
   )
 }

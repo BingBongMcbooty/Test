@@ -1,4 +1,5 @@
 import { Experience } from './scene/Experience'
+import { CameraDirectionalControls } from './ui/CameraDirectionalControls'
 import { CubeFeedback } from './ui/CubeFeedback'
 import { DebugStageControls } from './ui/DebugStageControls'
 import { DimensionPanel } from './ui/DimensionPanel'
@@ -13,6 +14,7 @@ function App() {
       <DimensionPanel />
       <CubeFeedback />
       <RevealControls />
+      <CameraDirectionalControls />
       <DebugStageControls />
     </div>
   )

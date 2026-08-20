@@ -1,4 +1,4 @@
-import { test, expect, type Page } from '@playwright/test'
+import { test, expect, type Page, type Locator } from '@playwright/test'
 
 // three.js renders with `preserveDrawingBuffer: false`, so `canvas.toDataURL()` can
 // read back stale/blank pixels regardless of what's actually on screen. A compositor
@@ -7,22 +7,25 @@ async function canvasSnapshot(page: Page): Promise<Buffer> {
   return page.locator('canvas').screenshot()
 }
 
-async function dragCanvas(page: Page, dx: number, dy: number) {
+interface CanvasPoint {
+  x: number
+  y: number
+}
+
+async function canvasCorner(page: Page): Promise<CanvasPoint> {
   const box = await page.locator('canvas').boundingBox()
   if (!box) throw new Error('canvas has no bounding box')
-  // Off-center, in a corner: since Task 10, a drag starting on the stage's object (which
-  // every stage frames comfortably near canvas center) draws an arrow instead of
-  // orbiting. These tests care about orbit specifically, so they start from a corner the
-  // object's collider never reaches.
-  const startX = box.x + box.width * 0.08
-  const startY = box.y + box.height * 0.08
+  // A corner every stage's shape collider never reaches (see cameraFraming.ts) — used to
+  // confirm an off-object drag never drives the camera, Task 17's core guarantee.
+  return { x: box.x + box.width * 0.08, y: box.y + box.height * 0.08 }
+}
 
-  await page.mouse.move(startX, startY)
+async function dragFrom(page: Page, from: CanvasPoint, dx: number, dy: number) {
+  await page.mouse.move(from.x, from.y)
   await page.mouse.down()
-  await page.mouse.move(startX + dx, startY + dy, { steps: 20 })
+  await page.mouse.move(from.x + dx, from.y + dy, { steps: 20 })
   await page.mouse.up()
-  // Let CameraControls' damping settle before reading the canvas back.
-  await page.waitForTimeout(500)
+  await page.waitForTimeout(300)
 }
 
 interface CameraState {
@@ -33,10 +36,11 @@ interface CameraState {
 
 // Experience.tsx's dev-only `window.__cameraControls` hook — reads the camera's actual
 // orbit state directly instead of canvas-pixel diffing, which the plane stage's
-// always-animating fill material (Task 7's noise shader) makes unreliable: idle drift
-// alone produces a nonzero pixel diff, so a screenshot comparison can't tell "orbit did
-// nothing" from "orbit did something too subtle to see." See Task 14's identical lesson
-// (store.ts's `window.__dimensionsStore`) for the precedent this follows.
+// always-animating fill material (Task 7's noise shader) and the cube/reveal stages'
+// shader materials make unreliable: idle drift alone produces a nonzero pixel diff, so
+// a screenshot comparison can't tell "camera did nothing" from "camera did something too
+// subtle to see." See Task 14's identical lesson (store.ts's `window.__dimensionsStore`)
+// for the precedent this follows.
 async function getCameraState(page: Page): Promise<CameraState> {
   return page.evaluate(() => {
     const controls = (window as unknown as { __cameraControls: CameraState }).__cameraControls
@@ -45,12 +49,23 @@ async function getCameraState(page: Page): Promise<CameraState> {
   })
 }
 
-// camera-controls' damped `setLookAt` transition has a long, slowly-converging tail —
-// a fixed wait before reading "before" state is a guessing game (it settled fine at
-// 700ms in one run, still had a barely-perceptible residual drift at 700ms in another).
-// Polling until two consecutive reads exactly match is what actually proves the
-// transition has finished, rather than picking a duration and hoping.
+// camera-controls' damped transitions have a long, slowly-converging tail — a fixed
+// wait before reading "before" state is a guessing game. Polling until two consecutive
+// reads exactly match is what actually proves a transition has finished.
+//
+// Task 17 fix (pre-existing flake, documented in PROGRESS.md's Task 16 notes and left
+// for a later pass): this can be called immediately after a stage-changing click, before
+// `Experience.tsx`'s `CameraRig` mount-time `useEffect` has actually run and populated
+// `window.__cameraControls` — a genuine race, not just a slow transition. Poll for the
+// hook's existence first, rather than assuming it's already there.
+async function waitForCameraControls(page: Page): Promise<void> {
+  await expect
+    .poll(() => page.evaluate(() => Boolean((window as unknown as { __cameraControls?: unknown }).__cameraControls)))
+    .toBe(true)
+}
+
 async function waitForCameraSettled(page: Page): Promise<CameraState> {
+  await waitForCameraControls(page)
   let previous = await getCameraState(page)
   for (let attempt = 0; attempt < 20; attempt++) {
     await page.waitForTimeout(150)
@@ -67,41 +82,56 @@ async function waitForCameraSettled(page: Page): Promise<CameraState> {
   throw new Error('camera never settled')
 }
 
-test.describe('orbit interaction', () => {
-  test('free horizontal orbit is not clamped, even past a full revolution', async ({ page }) => {
+// Task 17: on-screen camera buttons replace mouse-drag orbit everywhere it used to
+// exist. Each click nudges the camera by `ROTATE_STEP` (see
+// `CameraDirectionalControls.tsx`) with its own damped transition — clicking
+// repeatedly with a short pause between clicks is the button equivalent of
+// `orbit.spec.ts`'s old `dragCanvas` helper.
+async function clickRepeatedly(button: Locator, times: number) {
+  for (let i = 0; i < times; i++) {
+    await button.click()
+    await button.page().waitForTimeout(60)
+  }
+}
+
+test.describe('camera controls (Task 17: on-screen buttons, no mouse-drag orbit anywhere)', () => {
+  test('free horizontal rotation is not clamped, even past a full revolution', async ({
+    page,
+  }) => {
     const errors: string[] = []
     page.on('pageerror', (error) => errors.push(error.message))
 
     await page.goto('/')
     await expect(page.locator('canvas')).toBeVisible()
-    // Orbit only unlocks from Stage 3 (cube) on — see cameraFraming.ts's
-    // `orbitEnabled` note. These two tests are about orbit mechanics specifically, so
-    // they run on the cube stage rather than the default Stage 1 (line), which no
-    // longer orbits at all.
+    // Camera buttons only unlock from Stage 3 (cube) on with a full unclamped range —
+    // see cameraFraming.ts's `cameraControlsEnabled`/`azimuthRange` notes. These two
+    // tests are about rotation mechanics specifically, so they run on the cube stage.
     await page.getByTestId('debug-stage-cube').click()
     await page.waitForTimeout(300)
 
     const before = await canvasSnapshot(page)
     await page.screenshot({ path: 'e2e/screenshots/orbit-horizontal-before.png' })
 
-    // A drag well past the canvas width is more than one full azimuth revolution at
-    // camera-controls' default rotate sensitivity — if azimuth were clamped, this
-    // would visibly stall instead of continuing to spin.
-    await dragCanvas(page, -2200, 0)
+    // Enough clicks (0.35 rad each, see ROTATE_STEP) to exceed a full azimuth
+    // revolution — if azimuth were clamped, this would visibly stall instead of
+    // continuing to spin.
+    await clickRepeatedly(page.getByTestId('camera-control-right'), 20)
+    await waitForCameraSettled(page)
 
     const afterFullSpin = await canvasSnapshot(page)
     await page.screenshot({ path: 'e2e/screenshots/orbit-horizontal-after.png' })
     expect(afterFullSpin).not.toEqual(before)
 
     // Confirm it's still responsive afterwards, not stuck.
-    await dragCanvas(page, 200, 0)
+    await clickRepeatedly(page.getByTestId('camera-control-right'), 3)
+    await waitForCameraSettled(page)
     const afterFollowUp = await canvasSnapshot(page)
     expect(afterFollowUp).not.toEqual(afterFullSpin)
 
     expect(errors).toEqual([])
   })
 
-  test('dragging "over the top" reaches the pole without erroring or locking up', async ({
+  test('rotating "over the top" reaches the pole without erroring or locking up', async ({
     page,
   }) => {
     const errors: string[] = []
@@ -115,39 +145,46 @@ test.describe('orbit interaction', () => {
     const before = await canvasSnapshot(page)
     await page.screenshot({ path: 'e2e/screenshots/orbit-vertical-before.png' })
 
-    // A vertical drag far larger than the canvas height drives the polar angle to its
-    // pole (0 or PI) and holds it there — this is the "over the top" case PLAN.md
-    // calls out, checking the camera settles cleanly at the extreme instead of
-    // erroring or getting stuck.
-    await dragCanvas(page, 0, -1500)
+    // Enough "up" clicks to drive the polar angle to its pole (0 or PI) and hold it
+    // there — this is the "over the top" case PLAN.md calls out, checking the camera
+    // settles cleanly at the extreme instead of erroring or getting stuck.
+    await clickRepeatedly(page.getByTestId('camera-control-up'), 15)
+    await waitForCameraSettled(page)
 
     const atPole = await canvasSnapshot(page)
     await page.screenshot({ path: 'e2e/screenshots/orbit-vertical-after.png' })
     expect(atPole).not.toEqual(before)
 
-    // Orbiting horizontally from the pole should still work — nothing locked up.
-    await dragCanvas(page, 300, 0)
+    // Rotating horizontally from the pole should still work — nothing locked up.
+    await clickRepeatedly(page.getByTestId('camera-control-right'), 3)
+    await waitForCameraSettled(page)
     const afterFollowUp = await canvasSnapshot(page)
     expect(afterFollowUp).not.toEqual(atPole)
 
     expect(errors).toEqual([])
   })
 
-  test('cube stage stays framed after orbiting to a few different angles', async ({ page }) => {
+  test('cube stage stays framed after rotating to a few different angles via the buttons', async ({
+    page,
+  }) => {
     await page.goto('/')
     await page.getByTestId('debug-stage-cube').click()
     await page.waitForTimeout(300)
 
     await page.screenshot({ path: 'e2e/screenshots/orbit-cube-default.png' })
 
-    await dragCanvas(page, 400, 150)
+    await clickRepeatedly(page.getByTestId('camera-control-right'), 4)
+    await clickRepeatedly(page.getByTestId('camera-control-up'), 2)
+    await waitForCameraSettled(page)
     await page.screenshot({ path: 'e2e/screenshots/orbit-cube-angle-2.png' })
 
-    await dragCanvas(page, -700, -250)
+    await clickRepeatedly(page.getByTestId('camera-control-left'), 7)
+    await clickRepeatedly(page.getByTestId('camera-control-down'), 3)
+    await waitForCameraSettled(page)
     await page.screenshot({ path: 'e2e/screenshots/orbit-cube-angle-3.png' })
   })
 
-  test('Stage 1 (line): the camera is locked — dragging off the line does nothing', async ({
+  test('Stage 1 (line): no camera buttons are offered, and dragging off the line does nothing', async ({
     page,
   }) => {
     const errors: string[] = []
@@ -157,19 +194,21 @@ test.describe('orbit interaction', () => {
     await expect(page.locator('canvas')).toBeVisible()
     await page.waitForTimeout(300)
 
-    const before = await canvasSnapshot(page)
-    // Off-object, same corner-start dragCanvas uses on every other stage — on Stage 1
-    // this used to orbit (a line "floating" in 3D space); per the post-Task-15 design
-    // pivot, the 1D world has nothing to orbit around, so the canvas should be
-    // completely unaffected, not just close.
-    await dragCanvas(page, -800, 400)
-    const after = await canvasSnapshot(page)
+    await expect(page.getByTestId('camera-controls')).not.toBeVisible()
+
+    const before = await getCameraState(page)
+    const corner = await canvasCorner(page)
+    // Off-object, same corner-start every other stage's collider never reaches — mouse
+    // drag never orbits the camera anywhere anymore (Task 17), so this should be a
+    // complete no-op regardless of stage.
+    await dragFrom(page, corner, -800, 400)
+    const after = await getCameraState(page)
     expect(after).toEqual(before)
 
     expect(errors).toEqual([])
   })
 
-  test('Stage 2 (plane): the camera is locked — dragging off the plane does nothing', async ({
+  test('Stage 2 (plane): camera buttons rotate within a limited range; dragging off the plane does nothing', async ({
     page,
   }) => {
     const errors: string[] = []
@@ -181,14 +220,28 @@ test.describe('orbit interaction', () => {
     // settled before capturing "before" — otherwise a still-converging transition looks
     // like a spurious diff. See `waitForCameraSettled`'s comment for why this polls
     // instead of guessing a fixed duration.
-    const before = await waitForCameraSettled(page)
+    const dead0n = await waitForCameraSettled(page)
+    // Stage 2's resting framing is dead-on (Task 17) — azimuth 0, polar pi/2.
+    expect(dead0n.azimuthAngle).toBeCloseTo(0, 5)
+    expect(dead0n.polarAngle).toBeCloseTo(Math.PI / 2, 5)
+
+    await expect(page.getByTestId('camera-controls')).toBeVisible()
 
     // Pixel comparison isn't reliable here — the plane's fill material animates on its
     // own even at rest (Task 7's noise shader), so exact camera state is what actually
     // proves the drag was ignored, not just visually subtle.
-    await dragCanvas(page, 600, -350)
-    const after = await getCameraState(page)
-    expect(after).toEqual(before)
+    const corner = await canvasCorner(page)
+    await dragFrom(page, corner, 600, -350)
+    const afterDrag = await getCameraState(page)
+    expect(afterDrag).toEqual(dead0n)
+
+    // The buttons do work, but only within PLANE_TILT_RANGE (see cameraFraming.ts) —
+    // many more clicks than needed to reach the limit should still clamp there rather
+    // than spinning freely like Stage 3+.
+    await clickRepeatedly(page.getByTestId('camera-control-right'), 12)
+    const tilted = await waitForCameraSettled(page)
+    expect(tilted.azimuthAngle).toBeCloseTo(1.0, 2) // PLANE_TILT_RANGE
+    expect(tilted.azimuthAngle).not.toBeCloseTo(dead0n.azimuthAngle, 2)
 
     expect(errors).toEqual([])
   })
