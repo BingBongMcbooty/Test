@@ -38,6 +38,21 @@ export const STAGE_CONFIG: Record<Stage, StageConfig> = {
 }
 
 /**
+ * Vertex/edge counts for Stages 1-3's shapes, for `ui/DimensionPanel.tsx` (Task 15) to
+ * show the doubling pattern (`n`-cube: 2^n vertices, n*2^(n-1) edges) building up one
+ * dimension at a time — 1,4,12 edges is PLAN.md's own example. `null` for stages whose
+ * shape isn't a hypercube slice in this sense (reveal/closing) — Task 16 extends the
+ * panel with the tesseract's own counts (16 vertices, 32 edges) there.
+ */
+export const STAGE_SHAPE_COUNTS: Record<Stage, { vertices: number; edges: number } | null> = {
+  line: { vertices: 2, edges: 1 },
+  plane: { vertices: 4, edges: 4 },
+  cube: { vertices: 8, edges: 12 },
+  reveal: null,
+  closing: null,
+}
+
+/**
  * Stage 3 always fails `evaluateAttempt` (its occupiedAxes is all of x/y/z, so the
  * leftover is structurally the zero vector — see validation.ts) — this is the count of
  * such attempts before the app moves the player on to `reveal` regardless. PLAN.md's

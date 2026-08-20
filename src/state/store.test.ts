@@ -54,7 +54,7 @@ describe('advanceStage', () => {
 
   it('resets attempts, isDrawing, and lastResult on advance', () => {
     getState().startDrawing()
-    getState().recordAttempt({ success: true, axisContributions: { x: 1, y: 0, z: 0 } })
+    getState().recordAttempt({ success: true, axisContributions: { x: 1, y: 0, z: 0 }, orthogonalityRatio: 1 })
     getState().advanceStage()
     const state = getState()
     expect(state.attempts).toBe(0)
@@ -75,7 +75,7 @@ describe('startDrawing / endDrawing', () => {
 describe('recordAttempt', () => {
   it('stores the result, increments attempts, and stops drawing', () => {
     getState().startDrawing()
-    const result: AttemptResult = { success: false, axisContributions: { x: 0.5, y: 0.5, z: 0 } }
+    const result: AttemptResult = { success: false, axisContributions: { x: 0.5, y: 0.5, z: 0 }, orthogonalityRatio: 1 }
     getState().recordAttempt(result)
     const state = getState()
     expect(state.lastResult).toEqual(result)
@@ -84,11 +84,36 @@ describe('recordAttempt', () => {
   })
 
   it('accumulates across repeated failed attempts without resetting', () => {
-    getState().recordAttempt({ success: false, axisContributions: { x: 1, y: 0, z: 0 } })
-    getState().recordAttempt({ success: false, axisContributions: { x: 0, y: 1, z: 0 } })
-    getState().recordAttempt({ success: false, axisContributions: { x: 0, y: 0, z: 1 } })
+    getState().recordAttempt({ success: false, axisContributions: { x: 1, y: 0, z: 0 }, orthogonalityRatio: 1 })
+    getState().recordAttempt({ success: false, axisContributions: { x: 0, y: 1, z: 0 }, orthogonalityRatio: 1 })
+    getState().recordAttempt({ success: false, axisContributions: { x: 0, y: 0, z: 1 }, orthogonalityRatio: 1 })
     expect(getState().attempts).toBe(3)
     expect(getState().lastResult?.axisContributions).toEqual({ x: 0, y: 0, z: 1 })
+  })
+})
+
+describe('setLiveDragVector', () => {
+  it('sets and clears the live readout value', () => {
+    getState().setLiveDragVector({ x: 1, y: 2, z: 3 })
+    expect(getState().liveDragVector).toEqual({ x: 1, y: 2, z: 3 })
+    getState().setLiveDragVector(null)
+    expect(getState().liveDragVector).toBeNull()
+  })
+
+  it('is cleared on setStage and advanceStage, like the other per-stage fields', () => {
+    getState().setLiveDragVector({ x: 1, y: 2, z: 3 })
+    getState().setStage('cube')
+    expect(getState().liveDragVector).toBeNull()
+
+    getState().setLiveDragVector({ x: 1, y: 2, z: 3 })
+    getState().advanceStage()
+    expect(getState().liveDragVector).toBeNull()
+  })
+
+  it('is not itself touched by recordAttempt — ArrowDrag.tsx clears it separately on pointer-up', () => {
+    getState().setLiveDragVector({ x: 1, y: 2, z: 3 })
+    getState().recordAttempt({ success: false, axisContributions: { x: 1, y: 0, z: 0 }, orthogonalityRatio: 0 })
+    expect(getState().liveDragVector).toEqual({ x: 1, y: 2, z: 3 })
   })
 })
 
@@ -138,7 +163,7 @@ describe('reset', () => {
   it('restores initial state from anywhere', () => {
     getState().setStage('reveal')
     getState().startDrawing()
-    getState().recordAttempt({ success: true, axisContributions: { x: 1, y: 0, z: 0 } })
+    getState().recordAttempt({ success: true, axisContributions: { x: 1, y: 0, z: 0 }, orthogonalityRatio: 1 })
     getState().toggleRevealView()
     getState().rotateRevealXW(1.2)
     getState().rotateRevealYW(0.6)

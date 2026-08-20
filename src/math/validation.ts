@@ -10,6 +10,12 @@ export interface AttemptResult {
   success: boolean
   /** each axis's share of the dragged vector's magnitude, fractions summing to ~1 */
   axisContributions: Record<Axis, number>
+  /**
+   * leftover-magnitude / total-magnitude — the same ratio `success` is thresholded
+   * against, exposed numerically so a live readout (Task 15's `DimensionPanel`) can show
+   * it updating mid-drag rather than only the boolean outcome.
+   */
+  orthogonalityRatio: number
 }
 
 /**
@@ -57,5 +63,6 @@ export function evaluateAttempt(dragVector: Vec3, occupiedAxes: readonly Axis[])
   return {
     success: ratio >= ORTHOGONALITY_THRESHOLD,
     axisContributions: axisContributions(dragVector),
+    orthogonalityRatio: ratio,
   }
 }

@@ -118,6 +118,13 @@ export function ArrowDrag() {
 
       dragEndRef.current = hit
       setLiveDrag(hit.distanceTo(start) >= MIN_DRAG_LENGTH ? { start, end: hit } : null)
+
+      // Task 15's one narrow exception to "per-drag state stays local" (see store.ts's
+      // `liveDragVector` doc comment) — everything else in this handler is untouched.
+      const dragVector = hit.clone().sub(start)
+      useDimensionsStore
+        .getState()
+        .setLiveDragVector({ x: dragVector.x, y: dragVector.y, z: dragVector.z })
     }
 
     function onWindowPointerUp() {
@@ -132,6 +139,7 @@ export function ArrowDrag() {
       dragStartRef.current = null
       dragEndRef.current = null
       setLiveDrag(null)
+      useDimensionsStore.getState().setLiveDragVector(null)
 
       // Too-short drags never counted as a real attempt (Task 10's dead zone) — discard
       // without calling evaluateAttempt at all.

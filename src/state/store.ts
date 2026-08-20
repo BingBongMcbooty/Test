@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import type { AttemptResult } from '../math/validation'
+import type { AttemptResult, Vec3 } from '../math/validation'
 import { REVEAL_SLICE_RANGE, type RevealView, type Stage, nextStage } from './stageConfig'
 
 interface DimensionsState {
@@ -7,6 +7,23 @@ interface DimensionsState {
   attempts: number
   isDrawing: boolean
   lastResult: AttemptResult | null
+  /**
+   * Task 15: the live drag vector, for `ui/DimensionPanel.tsx`'s readout. The drag
+   * itself still lives in `ArrowDrag.tsx`'s local component state per the Task 3/10
+   * locked decision (per-drag state stays local, not in the store) — this one field is
+   * the deliberate, narrow exception PLAN.md's Task 15 section calls for, mirroring
+   * `isDrawing`'s own boundary-crossing lifecycle exactly rather than lifting the whole
+   * drag: set on every pointer-move during a drag, cleared to null on pointer-up (same
+   * as `ArrowDrag.tsx`'s local `liveDrag`) and on stage change (see `setStage`/
+   * `advanceStage`/`reset` below). Null is what tells the panel to show no row at all —
+   * either nothing has been attempted yet this stage, or nothing is being dragged right
+   * now; either way there's no live number to show. (An earlier version of this field
+   * stayed populated after release so the panel could show the last attempt's numbers
+   * at rest — reverted because the panel's text sits inside the same screen region
+   * `e2e/arrow-drag.spec.ts`/`validation-wiring.spec.ts`'s pixel-exact "back to at-rest"
+   * assertions screenshot, and a lingering non-placeholder value broke those.)
+   */
+  liveDragVector: Vec3 | null
   revealView: RevealView
   /**
    * xw-plane rotation angle (radians) — the default drag rotation, see RevealDrag.tsx.
@@ -25,6 +42,7 @@ interface DimensionsState {
   startDrawing: () => void
   endDrawing: () => void
   recordAttempt: (result: AttemptResult) => void
+  setLiveDragVector: (vector: Vec3 | null) => void
   toggleRevealView: () => void
   rotateRevealXW: (deltaAngle: number) => void
   rotateRevealYW: (deltaAngle: number) => void
@@ -37,6 +55,7 @@ const initialState = {
   attempts: 0,
   isDrawing: false,
   lastResult: null as AttemptResult | null,
+  liveDragVector: null as Vec3 | null,
   revealView: 'slice' as RevealView,
   revealRotationXW: 0,
   revealRotationYW: 0,
@@ -50,7 +69,8 @@ function clamp(value: number, min: number, max: number): number {
 export const useDimensionsStore = create<DimensionsState>((set) => ({
   ...initialState,
 
-  setStage: (stage) => set({ stage, attempts: 0, isDrawing: false, lastResult: null }),
+  setStage: (stage) =>
+    set({ stage, attempts: 0, isDrawing: false, lastResult: null, liveDragVector: null }),
 
   advanceStage: () =>
     set((state) => ({
@@ -58,6 +78,7 @@ export const useDimensionsStore = create<DimensionsState>((set) => ({
       attempts: 0,
       isDrawing: false,
       lastResult: null,
+      liveDragVector: null,
     })),
 
   startDrawing: () => set({ isDrawing: true }),
@@ -70,6 +91,8 @@ export const useDimensionsStore = create<DimensionsState>((set) => ({
       attempts: state.attempts + 1,
       isDrawing: false,
     })),
+
+  setLiveDragVector: (vector) => set({ liveDragVector: vector }),
 
   toggleRevealView: () =>
     set((state) => ({ revealView: state.revealView === 'slice' ? 'projection' : 'slice' })),

@@ -86,6 +86,26 @@ describe('evaluateAttempt — cube stage (occupied = x, y, z): always fails', ()
   })
 })
 
+describe('evaluateAttempt — orthogonalityRatio', () => {
+  it('exposes the same ratio success is thresholded against', () => {
+    // leftover = (0, 4, 0), |leftover| = 4, |total| = 5 -> ratio = 0.8
+    const result = evaluateAttempt({ x: 3, y: 4, z: 0 }, ['x'])
+    expect(result.orthogonalityRatio).toBeCloseTo(0.8)
+    expect(result.success).toBe(true)
+  })
+
+  it('is 0 for a drag entirely inside the occupied subspace', () => {
+    const result = evaluateAttempt({ x: 3, y: 4, z: 0 }, ['x', 'y'])
+    expect(result.orthogonalityRatio).toBe(0)
+    expect(result.success).toBe(false)
+  })
+
+  it('is 0 (not NaN) for a zero-length drag', () => {
+    const result = evaluateAttempt({ x: 0, y: 0, z: 0 }, ['x'])
+    expect(result.orthogonalityRatio).toBe(0)
+  })
+})
+
 describe('evaluateAttempt — axisContributions', () => {
   it('splits magnitude proportionally across axes', () => {
     // |x|+|y|+|z| = 1+2+3 = 6 -> fractions 1/6, 2/6, 3/6
