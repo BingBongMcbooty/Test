@@ -6,6 +6,7 @@ import { useDimensionsStore } from '../state/store'
 import { buildCameraFacingPlane, raycastPointerOntoPlane } from '../math/dragPlane'
 import { evaluateAttempt } from '../math/validation'
 import { CAMERA_FRAMING } from './cameraFraming'
+import { SHAPE_POSITION } from './shapePositions'
 import { STAGE_CONFIG } from '../state/stageConfig'
 import { FAIL_CUE_DURATION, FailCueArrow } from './FailCueArrow'
 import { LiveArrow } from './LiveArrow'
@@ -23,7 +24,8 @@ const MIN_DRAG_LENGTH = 0.2
 // plane/cube's real fills are a comfortably tight fit for their wireframes — each stage
 // gets its own generously-sized invisible mesh rather than raycasting the visible
 // geometry directly. Module-scoped and reused across renders, same reasoning as
-// `LiveArrow`'s shared geometries.
+// `LiveArrow`'s shared geometries. Positioned per-stage via `SHAPE_POSITION` (Task 16)
+// so each collider still sits exactly on top of its now-repositioned shape.
 const lineColliderGeometry = new CylinderGeometry(0.3, 0.3, 3.2, 8)
 const planeColliderGeometry = new PlaneGeometry(3.6, 3.6)
 const cubeColliderGeometry = new BoxGeometry(2.7, 2.7, 2.7)
@@ -182,6 +184,7 @@ export function ArrowDrag() {
       {stage === 'line' && (
         <mesh
           geometry={lineColliderGeometry}
+          position={SHAPE_POSITION.line}
           rotation={[0, 0, Math.PI / 2]}
           onPointerDown={handlePointerDown}
         >
@@ -189,12 +192,20 @@ export function ArrowDrag() {
         </mesh>
       )}
       {stage === 'plane' && (
-        <mesh geometry={planeColliderGeometry} onPointerDown={handlePointerDown}>
+        <mesh
+          geometry={planeColliderGeometry}
+          position={SHAPE_POSITION.plane}
+          onPointerDown={handlePointerDown}
+        >
           <meshBasicMaterial transparent opacity={0} depthWrite={false} side={DoubleSide} />
         </mesh>
       )}
       {stage === 'cube' && (
-        <mesh geometry={cubeColliderGeometry} onPointerDown={handlePointerDown}>
+        <mesh
+          geometry={cubeColliderGeometry}
+          position={SHAPE_POSITION.cube}
+          onPointerDown={handlePointerDown}
+        >
           <meshBasicMaterial transparent opacity={0} depthWrite={false} side={DoubleSide} />
         </mesh>
       )}

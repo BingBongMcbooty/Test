@@ -3,6 +3,7 @@ import { CameraControls, type CameraControlsImpl } from '@react-three/drei'
 import { useEffect, useRef } from 'react'
 import { useDimensionsStore } from '../state/store'
 import { ArrowDrag } from './ArrowDrag'
+import { Grid } from './Grid'
 import { RevealDrag } from './RevealDrag'
 import { CAMERA_FRAMING } from './cameraFraming'
 import { LIGHT_RIG } from './materials'
@@ -59,13 +60,22 @@ function SceneLights() {
 function CameraRig() {
   const controlsRef = useRef<CameraControlsImpl>(null)
   const stage = useDimensionsStore((state) => state.stage)
+  const hasMountedRef = useRef(false)
 
   useEffect(() => {
     const { position, target, orbitEnabled } = CAMERA_FRAMING[stage]
     // `true` enables camera-controls' own smoothed transition — Task 5 cut this in as
     // an instant `setLookAt(..., false)`; Task 11 is where stage-advance actually
     // happens via player interaction, so the cut is replaced with a real transition.
-    controlsRef.current?.setLookAt(...position, ...target, true)
+    // The very first application (on mount) stays an instant cut, though: `CameraControls`
+    // only knows the R3F `Canvas`'s initial camera *position*, not this stage's actual
+    // `target` (Stages 1-3's real targets moved off world-origin in Task 16, so its own
+    // implicit default target is no longer a coincidental match) — animating from that
+    // guessed starting orientation left the camera still visibly mid-settle well after a
+    // fixed post-load wait, which every pre-existing "at rest"/"orbit locked" test relies
+    // on being fully resolved. An instant cut on mount only, real transitions after.
+    controlsRef.current?.setLookAt(...position, ...target, hasMountedRef.current)
+    hasMountedRef.current = true
     // `.enabled` only gates the library's own pointer listeners (drag-to-orbit/zoom),
     // not this programmatic `setLookAt` call above — see `orbitEnabled`'s doc comment
     // in cameraFraming.ts for why Stages 1-2 lock this off.
@@ -106,6 +116,7 @@ export function Experience() {
     <Canvas camera={{ position: CAMERA_FRAMING.line.position, fov: 50 }}>
       <color attach="background" args={['#0a0a0f']} />
       <SceneLights />
+      <Grid />
       <StageGeometry />
       <CameraRig />
       <ArrowDrag />

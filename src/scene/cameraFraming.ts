@@ -32,11 +32,20 @@ export interface CameraFraming {
  * itself. See PROGRESS.md's post-Task-15 design-pivot note for the tension this left
  * unresolved: this framing is locked (no orbit) but still visibly oblique/3D-looking,
  * which only partially satisfies "a plane is a 2D world."
+ *
+ * Task 16: every position/target pair below is the pre-Task-16 origin-centered value
+ * translated by that stage's own `shapePositions.ts` offset — each shape moved to sit
+ * fully within the positive octant (to match the new coordinate-space grids), and the
+ * camera moved by the exact same vector so the view itself is untouched (same relative
+ * angle/distance to the shape, same screen-space mapping from a mouse drag to a world
+ * vector). This is what keeps every pre-existing drag/validation test passing
+ * unmodified — see `shapePositions.ts`'s doc comment for why a shared translation
+ * preserves that mapping exactly.
  */
 export const CAMERA_FRAMING: Record<Stage, CameraFraming> = {
-  line: { position: [0, 0, 5], target: [0, 0, 0], orbitEnabled: false },
-  plane: { position: [3.5, 3, 4.5], target: [0, 0, 0], orbitEnabled: false },
-  cube: { position: [3.5, 3.5, 4.5], target: [0, 0, 0], orbitEnabled: true },
+  line: { position: [1.5, 0, 5], target: [1.5, 0, 0], orbitEnabled: false },
+  plane: { position: [5, 4.5, 4.5], target: [1.5, 1.5, 0], orbitEnabled: false },
+  cube: { position: [4.75, 4.75, 5.75], target: [1.25, 1.25, 1.25], orbitEnabled: true },
   reveal: { position: [4, 3.5, 5], target: [0, 0, 0], orbitEnabled: true },
   closing: { position: [4, 3.5, 5], target: [0, 0, 0], orbitEnabled: true },
 }
