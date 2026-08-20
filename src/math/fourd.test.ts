@@ -5,6 +5,7 @@ import {
   TESSERACT_FACES,
   TESSERACT_VERTICES,
   type Vec4,
+  applyRevealRotation,
   projectTo3D,
   rotateXW,
   rotateYW,
@@ -126,6 +127,16 @@ describe('rotateXW / rotateYZ', () => {
     for (let i = 0; i < 16; i++) {
       for (let axis = 0; axis < 4; axis++) {
         expect(rotated[i][axis]).toBeCloseTo(TESSERACT_VERTICES[i][axis])
+      }
+    }
+  })
+
+  it('applyRevealRotation matches the same xw-then-yw composition callers used to write by hand', () => {
+    const byHand = rotateYW(rotateXW(TESSERACT_VERTICES, 0.4), 0.9)
+    const viaHelper = applyRevealRotation(TESSERACT_VERTICES, 0.4, 0.9)
+    for (let i = 0; i < 16; i++) {
+      for (let axis = 0; axis < 4; axis++) {
+        expect(viaHelper[i][axis]).toBeCloseTo(byHand[i][axis])
       }
     }
   })

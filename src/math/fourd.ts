@@ -187,6 +187,22 @@ export function sliceTesseract(
 }
 
 /**
+ * The tesseract's actual live rotation: both planes `RevealDrag.tsx`'s controller drives
+ * (xw by default, yw on Shift+drag — see `rotateYW`'s doc comment above for why both are
+ * needed), composed in the one fixed order the app always applies them in. Centralized
+ * here so every caller that needs the live rotated vertex set — `RevealStage.tsx`'s
+ * render and `ui/DimensionPanel.tsx`'s Task 19 readouts alike — uses the identical
+ * composition instead of each re-deriving the xw-then-yw order separately.
+ */
+export function applyRevealRotation(
+  vertices: readonly Vec4[],
+  rotationXW: number,
+  rotationYW: number,
+): Vec4[] {
+  return rotateYW(rotateXW(vertices, rotationXW), rotationYW)
+}
+
+/**
  * Distance of the 4D "viewer" along +w, used by `projectTo3D`'s perspective divide.
  * Must exceed the largest |w| a rotated tesseract vertex can reach (sqrt(2) ~= 1.414,
  * since rotation preserves x^2 + w^2 = 2 for a unit tesseract's corners) to keep the

@@ -1,4 +1,13 @@
 import { test, expect, type Page } from '@playwright/test'
+import {
+  PROJECTION_VIEWER_DISTANCE,
+  TESSERACT_EDGES,
+  TESSERACT_FACES,
+  TESSERACT_VERTICES,
+  applyRevealRotation,
+  sliceTesseract,
+} from '../src/math/fourd'
+import { TRACKED_VERTEX_INDEX } from '../src/scene/trackedVertex'
 
 interface CanvasPoint {
   x: number
@@ -130,6 +139,138 @@ test.describe('live instrumentation panel (Stages 1-3)', () => {
 
     await page.screenshot({ path: 'e2e/screenshots/instrumentation-stage3.png' })
     await page.mouse.up()
+
+    expect(errors).toEqual([])
+  })
+})
+
+interface RevealState {
+  revealView: 'slice' | 'projection'
+  revealRotationXW: number
+  revealRotationYW: number
+  revealSliceW0: number
+}
+
+// Same store dev-hook `e2e/reveal.spec.ts` already uses to read exact 4D state — see that
+// file's comment for why canvas-pixel diffing can't be trusted here (RevealStage's
+// material animates on its own regardless of drag input).
+function revealState(page: Page): Promise<RevealState> {
+  return page.evaluate(() => {
+    const store = (
+      window as unknown as {
+        __dimensionsStore: { getState: () => RevealState }
+      }
+    ).__dimensionsStore
+    const { revealView, revealRotationXW, revealRotationYW, revealSliceW0 } = store.getState()
+    return { revealView, revealRotationXW, revealRotationYW, revealSliceW0 }
+  })
+}
+
+async function dragFrom(page: Page, from: CanvasPoint, dx: number, dy: number) {
+  await page.mouse.move(from.x, from.y)
+  await page.mouse.down()
+  await page.mouse.move(from.x + dx, from.y + dy, { steps: 20 })
+  await page.mouse.up()
+}
+
+test.describe('live instrumentation panel (Stage 4 reveal)', () => {
+  test('rotation/slice/tracked-vertex readouts match math/fourd.ts fed the same drag-driven state', async ({
+    page,
+  }) => {
+    const errors: string[] = []
+    page.on('pageerror', (error) => errors.push(error.message))
+
+    await page.goto('/')
+    await page.getByTestId('debug-stage-reveal').click()
+    await page.waitForTimeout(300)
+
+    const center = await canvasCenter(page)
+    await dragFrom(page, center, 150, -80)
+    await page.waitForTimeout(100)
+
+    const state = await revealState(page)
+    expect(state.revealRotationXW).toBeGreaterThan(0)
+
+    // Independently recompute the tracked vertex's live x/y/z/w by feeding the exact
+    // same rotation state through the app's own math/fourd.ts functions — not a
+    // re-derivation of the panel's own arithmetic, the same technique
+    // e2e/reveal.spec.ts's regression test already uses.
+    const rotated = applyRevealRotation(
+      TESSERACT_VERTICES,
+      state.revealRotationXW,
+      state.revealRotationYW,
+    )
+    const [expectedX, expectedY, expectedZ, expectedW] = rotated[TRACKED_VERTEX_INDEX]
+
+    await expect(page.getByTestId('dimension-row-rotation-xw')).toHaveText(
+      `xw: ${((state.revealRotationXW * 180) / Math.PI).toFixed(1)}°`,
+    )
+    await expect(page.getByTestId('dimension-row-rotation-yw')).toHaveText(
+      `yw: ${((state.revealRotationYW * 180) / Math.PI).toFixed(1)}°`,
+    )
+    await expect(page.getByTestId('dimension-row-slice-w0')).toHaveText(
+      `w0: ${state.revealSliceW0.toFixed(2)}`,
+    )
+    await expect(page.getByTestId('dimension-row-x')).toHaveText(`x: ${expectedX.toFixed(2)}`)
+    await expect(page.getByTestId('dimension-row-y')).toHaveText(`y: ${expectedY.toFixed(2)}`)
+    await expect(page.getByTestId('dimension-row-z')).toHaveText(`z: ${expectedZ.toFixed(2)}`)
+    await expect(page.getByTestId('dimension-row-w')).toHaveText(`w: ${expectedW.toFixed(2)}`)
+
+    const expectedEdgeCount = sliceTesseract(rotated, TESSERACT_FACES, state.revealSliceW0).length
+    await expect(page.getByTestId('dimension-edge-count')).toHaveText(`edges: ${expectedEdgeCount}`)
+
+    expect(errors).toEqual([])
+  })
+
+  test('slice view shows live extent, "sliced away" for distance-from-projection; projection view is the mirror image', async ({
+    page,
+  }) => {
+    const errors: string[] = []
+    page.on('pageerror', (error) => errors.push(error.message))
+
+    await page.goto('/')
+    await page.getByTestId('debug-stage-reveal').click()
+    await page.waitForTimeout(300)
+
+    const center = await canvasCenter(page)
+    await dragFrom(page, center, 150, -80)
+    await page.waitForTimeout(100)
+
+    // Slice view (the default): edge count is live/dynamic, extent shows real numbers,
+    // distance-from-projection reads the "wrong lens" placeholder.
+    const extentText = await page.getByTestId('dimension-cross-section-extent').innerText()
+    expect(extentText).toMatch(/^Δx:-?\d+\.\d{2} Δy:-?\d+\.\d{2} Δz:-?\d+\.\d{2}$/)
+    await expect(page.getByTestId('dimension-distance-from-projection')).toHaveText('sliced away')
+
+    await page.screenshot({ path: 'e2e/screenshots/instrumentation-stage4-slice.png' })
+
+    await page.getByTestId('reveal-view-toggle').click()
+    await page.waitForTimeout(100)
+
+    // Projection view: edge count is the fixed 32 (a projection never drops anything),
+    // extent now reads the "wrong lens" placeholder, and distance-from-projection shows
+    // real numbers instead.
+    await expect(page.getByTestId('dimension-edge-count')).toHaveText(
+      `edges: ${TESSERACT_EDGES.length}`,
+    )
+    await expect(page.getByTestId('dimension-cross-section-extent')).toHaveText(
+      'hidden behind the shadow',
+    )
+    const distanceText = await page.getByTestId('dimension-distance-from-projection').innerText()
+    expect(distanceText).toMatch(/^dist: -?\d+\.\d{2} → ×-?\d+\.\d{2}$/)
+
+    const state = await revealState(page)
+    const rotated = applyRevealRotation(
+      TESSERACT_VERTICES,
+      state.revealRotationXW,
+      state.revealRotationYW,
+    )
+    const trackedW = rotated[TRACKED_VERTEX_INDEX][3]
+    const expectedDistance = PROJECTION_VIEWER_DISTANCE - trackedW
+    const expectedScale = PROJECTION_VIEWER_DISTANCE / expectedDistance
+    expect(distanceText).toBe(`dist: ${expectedDistance.toFixed(2)} → ×${expectedScale.toFixed(2)}`)
+
+    await page.screenshot({ path: 'e2e/screenshots/instrumentation-stage4-projection.png' })
 
     expect(errors).toEqual([])
   })
