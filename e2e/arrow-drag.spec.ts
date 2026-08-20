@@ -81,6 +81,10 @@ test.describe('pointer/drag controller', () => {
 
     await page.goto('/')
     await expect(page.locator('canvas')).toBeVisible()
+    // Orbit only unlocks from Stage 3 (cube) on — see cameraFraming.ts's
+    // `orbitEnabled` note. This test is specifically about the off-object-orbits/
+    // on-object-draws distinction, which needs a stage where orbit actually exists.
+    await page.getByTestId('debug-stage-cube').click()
     await page.waitForTimeout(300)
 
     const atRest = await canvasSnapshot(page)

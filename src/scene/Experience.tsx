@@ -61,12 +61,30 @@ function CameraRig() {
   const stage = useDimensionsStore((state) => state.stage)
 
   useEffect(() => {
-    const { position, target } = CAMERA_FRAMING[stage]
+    const { position, target, orbitEnabled } = CAMERA_FRAMING[stage]
     // `true` enables camera-controls' own smoothed transition — Task 5 cut this in as
     // an instant `setLookAt(..., false)`; Task 11 is where stage-advance actually
     // happens via player interaction, so the cut is replaced with a real transition.
     controlsRef.current?.setLookAt(...position, ...target, true)
+    // `.enabled` only gates the library's own pointer listeners (drag-to-orbit/zoom),
+    // not this programmatic `setLookAt` call above — see `orbitEnabled`'s doc comment
+    // in cameraFraming.ts for why Stages 1-2 lock this off.
+    if (controlsRef.current) controlsRef.current.enabled = orbitEnabled
   }, [stage])
+
+  // Dev-only escape hatch, same spirit as store.ts's `window.__dimensionsStore` (Task
+  // 14's note): lets e2e tests assert the camera's actual azimuth/polar/distance
+  // directly instead of canvas-pixel diffing, which is unreliable on stages whose
+  // material animates on its own (plane's noise fill, per Task 7). Needed to verify
+  // Stages 1-2's orbit lock — a plain pixel comparison there would confuse "orbit did
+  // nothing" with "orbit did something too subtle to show up," and can't tell the
+  // difference from the fill's own idle drift either. Dead code eliminated from the
+  // production build, same as the store hook.
+  useEffect(() => {
+    if (import.meta.env.DEV) {
+      Object.assign(window, { __cameraControls: controlsRef.current })
+    }
+  }, [])
 
   return (
     <CameraControls

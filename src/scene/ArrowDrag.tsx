@@ -5,6 +5,7 @@ import { BoxGeometry, CylinderGeometry, DoubleSide, PlaneGeometry, Plane, Raycas
 import { useDimensionsStore } from '../state/store'
 import { buildCameraFacingPlane, raycastPointerOntoPlane } from '../math/dragPlane'
 import { evaluateAttempt } from '../math/validation'
+import { CAMERA_FRAMING } from './cameraFraming'
 import { STAGE_CONFIG } from '../state/stageConfig'
 import { FAIL_CUE_DURATION, FailCueArrow } from './FailCueArrow'
 import { LiveArrow } from './LiveArrow'
@@ -130,7 +131,12 @@ export function ArrowDrag() {
     function onWindowPointerUp() {
       cleanupRef.current?.()
       cleanupRef.current = null
-      if (controlsRef.current) controlsRef.current.enabled = true
+      // Restore to this stage's own orbit-lock state, not unconditionally `true` — on
+      // Stages 1-2 that would silently re-enable the free orbit `cameraFraming.ts`'s
+      // `orbitEnabled: false` is meant to keep off. A successful drag changes `stage`
+      // right after this, at which point `Experience.tsx`'s `CameraRig` effect applies
+      // the new stage's own setting anyway; this matters for the stay-on-stage (fail) case.
+      if (controlsRef.current) controlsRef.current.enabled = CAMERA_FRAMING[stage].orbitEnabled
       endDrawing()
 
       const start = dragStartRef.current
