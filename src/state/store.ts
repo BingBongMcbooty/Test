@@ -24,6 +24,16 @@ interface DimensionsState {
    * assertions screenshot, and a lingering non-placeholder value broke those.)
    */
   liveDragVector: Vec3 | null
+  /**
+   * Task 18: Stages 1-2 no longer advance the instant a drag passes — `ArrowDrag.tsx`
+   * sets this (via `markStagePassed`) on the first passing drag this stage instead of
+   * calling `advanceStage()` directly, and `ui/StageContinue.tsx` shows a manual
+   * "Continue" button once it's true. Deliberately untouched by `recordAttempt` — a
+   * later failed attempt on the same stage (the player exploring further, per the "no
+   * artificial lock" locked decision) must not un-pass it and hide the button. Reset to
+   * `false` alongside the other per-stage fields on `setStage`/`advanceStage`/`reset`.
+   */
+  stagePassed: boolean
   revealView: RevealView
   /**
    * xw-plane rotation angle (radians) — the default drag rotation, see RevealDrag.tsx.
@@ -42,6 +52,7 @@ interface DimensionsState {
   startDrawing: () => void
   endDrawing: () => void
   recordAttempt: (result: AttemptResult) => void
+  markStagePassed: () => void
   setLiveDragVector: (vector: Vec3 | null) => void
   toggleRevealView: () => void
   rotateRevealXW: (deltaAngle: number) => void
@@ -56,6 +67,7 @@ const initialState = {
   isDrawing: false,
   lastResult: null as AttemptResult | null,
   liveDragVector: null as Vec3 | null,
+  stagePassed: false,
   revealView: 'slice' as RevealView,
   revealRotationXW: 0,
   revealRotationYW: 0,
@@ -70,7 +82,14 @@ export const useDimensionsStore = create<DimensionsState>((set) => ({
   ...initialState,
 
   setStage: (stage) =>
-    set({ stage, attempts: 0, isDrawing: false, lastResult: null, liveDragVector: null }),
+    set({
+      stage,
+      attempts: 0,
+      isDrawing: false,
+      lastResult: null,
+      liveDragVector: null,
+      stagePassed: false,
+    }),
 
   advanceStage: () =>
     set((state) => ({
@@ -79,6 +98,7 @@ export const useDimensionsStore = create<DimensionsState>((set) => ({
       isDrawing: false,
       lastResult: null,
       liveDragVector: null,
+      stagePassed: false,
     })),
 
   startDrawing: () => set({ isDrawing: true }),
@@ -91,6 +111,8 @@ export const useDimensionsStore = create<DimensionsState>((set) => ({
       attempts: state.attempts + 1,
       isDrawing: false,
     })),
+
+  markStagePassed: () => set({ stagePassed: true }),
 
   setLiveDragVector: (vector) => set({ liveDragVector: vector }),
 

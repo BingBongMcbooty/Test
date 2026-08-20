@@ -92,6 +92,36 @@ describe('recordAttempt', () => {
   })
 })
 
+describe('markStagePassed / stagePassed', () => {
+  it('starts false and flips true when marked', () => {
+    expect(getState().stagePassed).toBe(false)
+    getState().markStagePassed()
+    expect(getState().stagePassed).toBe(true)
+  })
+
+  it('is not reset by a later recordAttempt, including a failing one', () => {
+    getState().markStagePassed()
+    getState().recordAttempt({ success: false, axisContributions: { x: 1, y: 0, z: 0 }, orthogonalityRatio: 0.2 })
+    expect(getState().stagePassed).toBe(true)
+  })
+
+  it('is cleared on setStage and advanceStage, like the other per-stage fields', () => {
+    getState().markStagePassed()
+    getState().setStage('cube')
+    expect(getState().stagePassed).toBe(false)
+
+    getState().markStagePassed()
+    getState().advanceStage()
+    expect(getState().stagePassed).toBe(false)
+  })
+
+  it('is cleared by reset', () => {
+    getState().markStagePassed()
+    getState().reset()
+    expect(getState().stagePassed).toBe(false)
+  })
+})
+
 describe('setLiveDragVector', () => {
   it('sets and clears the live readout value', () => {
     getState().setLiveDragVector({ x: 1, y: 2, z: 3 })

@@ -61,7 +61,7 @@ async function tiltPlaneCamera(page: Page) {
 }
 
 test.describe('validation wiring (Stages 1 & 2)', () => {
-  test('a roughly-orthogonal drag on Stage 1 advances to Stage 2 with an animated camera transition', async ({
+  test('a roughly-orthogonal drag on Stage 1 does not advance immediately — it shows a Continue button and lets the player keep exploring', async ({
     page,
   }) => {
     const errors: string[] = []
@@ -75,6 +75,21 @@ test.describe('validation wiring (Stages 1 & 2)', () => {
     const center = await canvasCenter(page)
     await dragFrom(page, center, LINE_PASS_DELTA.dx, LINE_PASS_DELTA.dy)
 
+    // Task 18: a pass no longer yanks the player to the next stage — still Stage 1,
+    // with a manual Continue button now showing.
+    await expect(page.getByText('LINE', { exact: true })).toBeVisible()
+    await expect(page.getByTestId('stage-continue-button')).toBeVisible()
+
+    // The player can keep exploring: a failing drag right after the pass stays on
+    // Stage 1 and the Continue button stays put (not un-passed by a later fail).
+    await dragFrom(page, center, LINE_FAIL_DELTA.dx, LINE_FAIL_DELTA.dy)
+    await page.waitForTimeout(100)
+    await expect(page.getByText('LINE', { exact: true })).toBeVisible()
+    await expect(page.getByTestId('stage-continue-button')).toBeVisible()
+    await page.waitForTimeout(700) // let the fail cue finish fading
+
+    // Only the explicit Continue click actually advances the stage.
+    await page.getByTestId('stage-continue-button').click()
     await expect(page.getByText('PLANE', { exact: true })).toBeVisible()
 
     // The camera transition is animated (drei's `setLookAt(..., true)`), not an
@@ -130,7 +145,9 @@ test.describe('validation wiring (Stages 1 & 2)', () => {
     expect(errors).toEqual([])
   })
 
-  test('a roughly-orthogonal drag on Stage 2 advances to Stage 3 (cube)', async ({ page }) => {
+  test('a roughly-orthogonal drag on Stage 2 shows a Continue button; the explicit continue advances to Stage 3 (cube)', async ({
+    page,
+  }) => {
     const errors: string[] = []
     page.on('pageerror', (error) => errors.push(error.message))
 
@@ -146,6 +163,11 @@ test.describe('validation wiring (Stages 1 & 2)', () => {
     const center = await canvasCenter(page)
     await dragFrom(page, center, PLANE_PASS_DELTA.dx, PLANE_PASS_DELTA.dy)
 
+    // Task 18: still Stage 2 right after the pass — Continue button shows instead.
+    await expect(page.getByText('PLANE', { exact: true })).toBeVisible()
+    await expect(page.getByTestId('stage-continue-button')).toBeVisible()
+
+    await page.getByTestId('stage-continue-button').click()
     await expect(page.getByText('CUBE', { exact: true })).toBeVisible()
     await page.waitForTimeout(600)
     await page.screenshot({ path: 'e2e/screenshots/validation-stage2-pass-to-cube.png' })

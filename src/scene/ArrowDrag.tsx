@@ -143,7 +143,17 @@ export function ArrowDrag() {
       useDimensionsStore.getState().recordAttempt(result)
 
       if (result.success) {
-        useDimensionsStore.getState().advanceStage()
+        // Task 18: Stages 1-2 no longer advance the instant a drag passes — flag it as
+        // passed and let ui/StageContinue.tsx's manual button do the actual advance, so
+        // the player can keep exploring (pass or fail again) in the meantime. Stage 3's
+        // cube never reaches this branch in practice (its occupiedAxes is structurally
+        // all of x/y/z — see stageConfig.ts's CUBE_ATTEMPTS_BEFORE_REVEAL doc comment)
+        // but advances immediately here too, same as before, if it ever did.
+        if (stage === 'line' || stage === 'plane') {
+          useDimensionsStore.getState().markStagePassed()
+        } else {
+          useDimensionsStore.getState().advanceStage()
+        }
       } else {
         setFailCue({ start, end })
         failCueTimeoutRef.current = window.setTimeout(() => {

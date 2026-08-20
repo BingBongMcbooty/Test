@@ -5,6 +5,7 @@ import { DebugStageControls } from './ui/DebugStageControls'
 import { DimensionPanel } from './ui/DimensionPanel'
 import { HUD } from './ui/HUD'
 import { RevealControls } from './ui/RevealControls'
+import { StageContinue } from './ui/StageContinue'
 
 function App() {
   return (
@@ -13,6 +14,7 @@ function App() {
       <HUD />
       <DimensionPanel />
       <CubeFeedback />
+      <StageContinue />
       <RevealControls />
       <CameraDirectionalControls />
       <DebugStageControls />
