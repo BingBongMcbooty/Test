@@ -140,9 +140,13 @@ function RevealDimensionPanel() {
  */
 export function DimensionPanel() {
   const stage = useDimensionsStore((state) => state.stage)
+  const revealWarmupActive = useDimensionsStore((state) => state.revealWarmupActive)
   const liveDragVector = useDimensionsStore((state) => state.liveDragVector)
 
-  if (stage === 'reveal') return <RevealDimensionPanel />
+  // Task 20: the cone warm-up isn't the tesseract, so its rotation/slice-offset/tracked-
+  // vertex readouts would be stale/meaningless here — no panel at all while it's active,
+  // same treatment 'closing' gets below for "not a hypercube-slice shape."
+  if (stage === 'reveal') return revealWarmupActive ? null : <RevealDimensionPanel />
 
   const shapeCounts = STAGE_SHAPE_COUNTS[stage]
   // 'closing' isn't a hypercube-slice shape in this sense and gets no panel at all.

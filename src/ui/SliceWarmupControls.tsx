@@ -1,19 +1,17 @@
 import { useDimensionsStore } from '../state/store'
 
 /**
- * Stage 4's view toggle — swaps `revealView` between the hyperplane slice and the
- * perspective projection without touching the underlying rotation/slice-offset state
- * (`RevealDrag.tsx` is what changes that), so toggling never resets what the player did.
+ * Task 20: hint text + skip button for `scene/SliceWarmup.tsx`'s cone-slicing warm-up.
+ * Genuinely skippable from the moment it appears (no forced minimum play time) — PLAN.md
+ * leaves "how obviously skippable" to this task's own judgment, and a persistent,
+ * always-clickable button is the least ambiguous way to satisfy "skippable."
  */
-export function RevealControls() {
+export function SliceWarmupControls() {
   const stage = useDimensionsStore((state) => state.stage)
   const revealWarmupActive = useDimensionsStore((state) => state.revealWarmupActive)
-  const revealView = useDimensionsStore((state) => state.revealView)
-  const toggleRevealView = useDimensionsStore((state) => state.toggleRevealView)
+  const finishRevealWarmup = useDimensionsStore((state) => state.finishRevealWarmup)
 
-  // Task 20: the cone warm-up plays first and has no view toggle of its own — see
-  // `ui/SliceWarmupControls.tsx`.
-  if (stage !== 'reveal' || revealWarmupActive) return null
+  if (stage !== 'reveal' || !revealWarmupActive) return null
 
   return (
     <div
@@ -30,12 +28,12 @@ export function RevealControls() {
       }}
     >
       <div style={{ fontSize: '0.7rem', letterSpacing: '0.04em', opacity: 0.55, color: '#e5e4e7' }}>
-        drag to rotate · hold shift to rotate the other way · drag vertically to slice
+        drag to tilt the cone · drag vertically to move the cutting plane
       </div>
       <button
         type="button"
-        data-testid="reveal-view-toggle"
-        onClick={() => toggleRevealView()}
+        data-testid="slice-warmup-skip"
+        onClick={() => finishRevealWarmup()}
         style={{
           padding: '0.4rem 1rem',
           fontSize: '0.75rem',
@@ -46,7 +44,7 @@ export function RevealControls() {
           cursor: 'pointer',
         }}
       >
-        {revealView === 'slice' ? 'Show projection' : 'Show slice'}
+        Continue to the 4th dimension
       </button>
     </div>
   )

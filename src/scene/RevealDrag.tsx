@@ -55,6 +55,7 @@ const colliderGeometry = new SphereGeometry(2.2, 12, 12)
  */
 export function RevealDrag() {
   const stage = useDimensionsStore((state) => state.stage)
+  const revealWarmupActive = useDimensionsStore((state) => state.revealWarmupActive)
   const rotateRevealXW = useDimensionsStore((state) => state.rotateRevealXW)
   const rotateRevealYW = useDimensionsStore((state) => state.rotateRevealYW)
   const adjustRevealSlice = useDimensionsStore((state) => state.adjustRevealSlice)
@@ -123,7 +124,7 @@ export function RevealDrag() {
 
   return (
     <>
-      {stage === 'reveal' && (
+      {stage === 'reveal' && !revealWarmupActive && (
         <mesh geometry={colliderGeometry} onPointerDown={handlePointerDown}>
           <meshBasicMaterial transparent opacity={0} depthWrite={false} />
         </mesh>

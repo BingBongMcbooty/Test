@@ -54,7 +54,11 @@ describe('advanceStage', () => {
 
   it('resets attempts, isDrawing, and lastResult on advance', () => {
     getState().startDrawing()
-    getState().recordAttempt({ success: true, axisContributions: { x: 1, y: 0, z: 0 }, orthogonalityRatio: 1 })
+    getState().recordAttempt({
+      success: true,
+      axisContributions: { x: 1, y: 0, z: 0 },
+      orthogonalityRatio: 1,
+    })
     getState().advanceStage()
     const state = getState()
     expect(state.attempts).toBe(0)
@@ -75,7 +79,11 @@ describe('startDrawing / endDrawing', () => {
 describe('recordAttempt', () => {
   it('stores the result, increments attempts, and stops drawing', () => {
     getState().startDrawing()
-    const result: AttemptResult = { success: false, axisContributions: { x: 0.5, y: 0.5, z: 0 }, orthogonalityRatio: 1 }
+    const result: AttemptResult = {
+      success: false,
+      axisContributions: { x: 0.5, y: 0.5, z: 0 },
+      orthogonalityRatio: 1,
+    }
     getState().recordAttempt(result)
     const state = getState()
     expect(state.lastResult).toEqual(result)
@@ -84,9 +92,21 @@ describe('recordAttempt', () => {
   })
 
   it('accumulates across repeated failed attempts without resetting', () => {
-    getState().recordAttempt({ success: false, axisContributions: { x: 1, y: 0, z: 0 }, orthogonalityRatio: 1 })
-    getState().recordAttempt({ success: false, axisContributions: { x: 0, y: 1, z: 0 }, orthogonalityRatio: 1 })
-    getState().recordAttempt({ success: false, axisContributions: { x: 0, y: 0, z: 1 }, orthogonalityRatio: 1 })
+    getState().recordAttempt({
+      success: false,
+      axisContributions: { x: 1, y: 0, z: 0 },
+      orthogonalityRatio: 1,
+    })
+    getState().recordAttempt({
+      success: false,
+      axisContributions: { x: 0, y: 1, z: 0 },
+      orthogonalityRatio: 1,
+    })
+    getState().recordAttempt({
+      success: false,
+      axisContributions: { x: 0, y: 0, z: 1 },
+      orthogonalityRatio: 1,
+    })
     expect(getState().attempts).toBe(3)
     expect(getState().lastResult?.axisContributions).toEqual({ x: 0, y: 0, z: 1 })
   })
@@ -101,7 +121,11 @@ describe('markStagePassed / stagePassed', () => {
 
   it('is not reset by a later recordAttempt, including a failing one', () => {
     getState().markStagePassed()
-    getState().recordAttempt({ success: false, axisContributions: { x: 1, y: 0, z: 0 }, orthogonalityRatio: 0.2 })
+    getState().recordAttempt({
+      success: false,
+      axisContributions: { x: 1, y: 0, z: 0 },
+      orthogonalityRatio: 0.2,
+    })
     expect(getState().stagePassed).toBe(true)
   })
 
@@ -142,7 +166,11 @@ describe('setLiveDragVector', () => {
 
   it('is not itself touched by recordAttempt — ArrowDrag.tsx clears it separately on pointer-up', () => {
     getState().setLiveDragVector({ x: 1, y: 2, z: 3 })
-    getState().recordAttempt({ success: false, axisContributions: { x: 1, y: 0, z: 0 }, orthogonalityRatio: 0 })
+    getState().recordAttempt({
+      success: false,
+      axisContributions: { x: 1, y: 0, z: 0 },
+      orthogonalityRatio: 0,
+    })
     expect(getState().liveDragVector).toEqual({ x: 1, y: 2, z: 3 })
   })
 })
@@ -189,11 +217,62 @@ describe('adjustRevealSlice', () => {
   })
 })
 
+describe('revealWarmupActive / finishRevealWarmup', () => {
+  it('starts false', () => {
+    expect(getState().revealWarmupActive).toBe(false)
+  })
+
+  it('advanceStage sets it true only when landing on reveal, not other stages', () => {
+    getState().advanceStage() // -> plane
+    expect(getState().revealWarmupActive).toBe(false)
+    getState().advanceStage() // -> cube
+    expect(getState().revealWarmupActive).toBe(false)
+    getState().advanceStage() // -> reveal
+    expect(getState().revealWarmupActive).toBe(true)
+    getState().advanceStage() // -> closing
+    expect(getState().revealWarmupActive).toBe(false)
+  })
+
+  it('setStage never activates it, even when jumping straight to reveal', () => {
+    getState().setStage('reveal')
+    expect(getState().stage).toBe('reveal')
+    expect(getState().revealWarmupActive).toBe(false)
+  })
+
+  it('setStage clears it if it was already active', () => {
+    getState().setStage('cube')
+    getState().advanceStage() // -> reveal, activates the warmup
+    expect(getState().revealWarmupActive).toBe(true)
+    getState().setStage('reveal')
+    expect(getState().revealWarmupActive).toBe(false)
+  })
+
+  it('finishRevealWarmup clears it without touching the stage', () => {
+    getState().setStage('cube')
+    getState().advanceStage()
+    expect(getState().revealWarmupActive).toBe(true)
+    getState().finishRevealWarmup()
+    expect(getState().revealWarmupActive).toBe(false)
+    expect(getState().stage).toBe('reveal')
+  })
+
+  it('is cleared by reset', () => {
+    getState().setStage('cube')
+    getState().advanceStage()
+    getState().reset()
+    expect(getState().revealWarmupActive).toBe(false)
+  })
+})
+
 describe('reset', () => {
   it('restores initial state from anywhere', () => {
     getState().setStage('reveal')
     getState().startDrawing()
-    getState().recordAttempt({ success: true, axisContributions: { x: 1, y: 0, z: 0 }, orthogonalityRatio: 1 })
+    getState().recordAttempt({
+      success: true,
+      axisContributions: { x: 1, y: 0, z: 0 },
+      orthogonalityRatio: 1,
+    })
     getState().toggleRevealView()
     getState().rotateRevealXW(1.2)
     getState().rotateRevealYW(0.6)

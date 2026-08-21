@@ -46,6 +46,17 @@ interface DimensionsState {
   revealRotationYW: number
   /** Stage 4's hyperplane slice offset, clamped to +-REVEAL_SLICE_RANGE. */
   revealSliceW0: number
+  /**
+   * Task 20: whether the 3D slicing warm-up (`scene/SliceWarmup.tsx`) is showing instead
+   * of the tesseract itself. Only ever set `true` by `advanceStage()` landing on
+   * `'reveal'` — real gameplay progression from the cube stage — not by `setStage`,
+   * which `ui/DebugStageControls.tsx` and every pre-existing reveal-stage Playwright
+   * test use to jump straight to the tesseract for testing convenience; leaving those
+   * untouched by this task means none of them needed updating. `finishRevealWarmup`
+   * (called by the warm-up's own skip button, or once the player's played with it a
+   * bit) is the only way back to `false` short of a stage change.
+   */
+  revealWarmupActive: boolean
 
   setStage: (stage: Stage) => void
   advanceStage: () => void
@@ -58,6 +69,7 @@ interface DimensionsState {
   rotateRevealXW: (deltaAngle: number) => void
   rotateRevealYW: (deltaAngle: number) => void
   adjustRevealSlice: (delta: number) => void
+  finishRevealWarmup: () => void
   reset: () => void
 }
 
@@ -72,6 +84,7 @@ const initialState = {
   revealRotationXW: 0,
   revealRotationYW: 0,
   revealSliceW0: 0,
+  revealWarmupActive: false,
 }
 
 function clamp(value: number, min: number, max: number): number {
@@ -89,17 +102,22 @@ export const useDimensionsStore = create<DimensionsState>((set) => ({
       lastResult: null,
       liveDragVector: null,
       stagePassed: false,
+      revealWarmupActive: false,
     }),
 
   advanceStage: () =>
-    set((state) => ({
-      stage: nextStage(state.stage),
-      attempts: 0,
-      isDrawing: false,
-      lastResult: null,
-      liveDragVector: null,
-      stagePassed: false,
-    })),
+    set((state) => {
+      const stage = nextStage(state.stage)
+      return {
+        stage,
+        attempts: 0,
+        isDrawing: false,
+        lastResult: null,
+        liveDragVector: null,
+        stagePassed: false,
+        revealWarmupActive: stage === 'reveal',
+      }
+    }),
 
   startDrawing: () => set({ isDrawing: true }),
 
@@ -129,6 +147,8 @@ export const useDimensionsStore = create<DimensionsState>((set) => ({
     set((state) => ({
       revealSliceW0: clamp(state.revealSliceW0 + delta, -REVEAL_SLICE_RANGE, REVEAL_SLICE_RANGE),
     })),
+
+  finishRevealWarmup: () => set({ revealWarmupActive: false }),
 
   reset: () => set({ ...initialState }),
 }))

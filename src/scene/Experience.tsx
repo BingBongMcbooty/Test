@@ -5,6 +5,7 @@ import { useDimensionsStore } from '../state/store'
 import { ArrowDrag } from './ArrowDrag'
 import { Grid } from './Grid'
 import { RevealDrag } from './RevealDrag'
+import { SliceWarmup } from './SliceWarmup'
 import { CAMERA_FRAMING } from './cameraFraming'
 import { cameraControlsRef } from './cameraControlsRef'
 import { LIGHT_RIG } from './materials'
@@ -15,6 +16,7 @@ import { RevealStage } from './stages/RevealStage'
 
 function StageGeometry() {
   const stage = useDimensionsStore((state) => state.stage)
+  const revealWarmupActive = useDimensionsStore((state) => state.revealWarmupActive)
 
   switch (stage) {
     case 'line':
@@ -24,7 +26,9 @@ function StageGeometry() {
     case 'cube':
       return <CubeStage />
     case 'reveal':
-      return <RevealStage />
+      // Task 20: the cone-slicing warm-up plays first, before the tesseract itself
+      // takes over — see `state/store.ts`'s `revealWarmupActive` for how that's gated.
+      return revealWarmupActive ? <SliceWarmup /> : <RevealStage />
     // 'closing' gets its own scene in Task 15.
     default:
       return null
