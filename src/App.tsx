@@ -1,5 +1,7 @@
 import { Experience } from './scene/Experience'
 import { CameraDirectionalControls } from './ui/CameraDirectionalControls'
+import { ClosingBeat } from './ui/ClosingBeat'
+import { ClosingContinue } from './ui/ClosingContinue'
 import { CubeFeedback } from './ui/CubeFeedback'
 import { DebugStageControls } from './ui/DebugStageControls'
 import { DimensionPanel } from './ui/DimensionPanel'
@@ -18,6 +20,8 @@ function App() {
       <StageContinue />
       <RevealControls />
       <SliceWarmupControls />
+      <ClosingContinue />
+      <ClosingBeat />
       <CameraDirectionalControls />
       <DebugStageControls />
     </div>

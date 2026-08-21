@@ -34,7 +34,9 @@ function StageGeometry() {
       // Task 21: the chirality demo is a third lens on the same reveal-stage 4D state,
       // swapped in by `revealView` exactly like the slice/projection swap already was.
       return revealView === 'chirality' ? <ChiralityDemo /> : <RevealStage />
-    // 'closing' gets its own scene in Task 15.
+    // Task 22: 'closing' deliberately renders no shape — an empty void (still lit, no
+    // grid per Grid.tsx's note) is the backdrop for `ui/ClosingBeat.tsx`'s fade-in line
+    // and restart button, not a new 3D scene of its own.
     default:
       return null
   }

@@ -12,6 +12,10 @@ const STAGE_LABELS = {
 export function HUD() {
   const stage = useDimensionsStore((state) => state.stage)
   const { prompt } = STAGE_CONFIG[stage]
+  // Task 22: 'closing' gets a deliberate fade-in for its line instead of this HUD's
+  // usual instant-cut prompt — `ui/ClosingBeat.tsx` owns rendering it (same text, from
+  // the same `STAGE_CONFIG` entry) so it isn't shown twice.
+  const showPrompt = stage !== 'closing'
 
   return (
     <div
@@ -30,7 +34,9 @@ export function HUD() {
       <div style={{ fontSize: '0.8rem', letterSpacing: '0.2em', opacity: 0.6 }}>
         {STAGE_LABELS[stage].toUpperCase()}
       </div>
-      <div style={{ marginTop: '0.5rem', fontSize: '1.1rem', fontWeight: 300 }}>{prompt}</div>
+      {showPrompt && (
+        <div style={{ marginTop: '0.5rem', fontSize: '1.1rem', fontWeight: 300 }}>{prompt}</div>
+      )}
     </div>
   )
 }
