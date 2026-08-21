@@ -176,10 +176,12 @@ describe('setLiveDragVector', () => {
 })
 
 describe('toggleRevealView', () => {
-  it('flips between slice and projection', () => {
+  it('cycles slice -> projection -> chirality -> slice', () => {
     expect(getState().revealView).toBe('slice')
     getState().toggleRevealView()
     expect(getState().revealView).toBe('projection')
+    getState().toggleRevealView()
+    expect(getState().revealView).toBe('chirality')
     getState().toggleRevealView()
     expect(getState().revealView).toBe('slice')
   })

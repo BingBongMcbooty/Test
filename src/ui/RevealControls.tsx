@@ -1,9 +1,18 @@
 import { useDimensionsStore } from '../state/store'
+import type { RevealView } from '../state/stageConfig'
+
+/** Task 21: each button label names the *next* view a click switches to. */
+const NEXT_VIEW_LABEL: Record<RevealView, string> = {
+  slice: 'Show projection',
+  projection: 'Show chirality demo',
+  chirality: 'Show slice',
+}
 
 /**
- * Stage 4's view toggle — swaps `revealView` between the hyperplane slice and the
- * perspective projection without touching the underlying rotation/slice-offset state
- * (`RevealDrag.tsx` is what changes that), so toggling never resets what the player did.
+ * Stage 4's view toggle — cycles `revealView` through the hyperplane slice, the
+ * perspective projection, and the chirality/mirror-flip demo (Task 21), without touching
+ * the underlying rotation/slice-offset state (`RevealDrag.tsx` is what changes that), so
+ * toggling never resets what the player did.
  */
 export function RevealControls() {
   const stage = useDimensionsStore((state) => state.stage)
@@ -46,7 +55,7 @@ export function RevealControls() {
           cursor: 'pointer',
         }}
       >
-        {revealView === 'slice' ? 'Show projection' : 'Show slice'}
+        {NEXT_VIEW_LABEL[revealView]}
       </button>
     </div>
   )

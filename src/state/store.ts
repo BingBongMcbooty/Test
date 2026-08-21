@@ -1,6 +1,12 @@
 import { create } from 'zustand'
 import type { AttemptResult, Vec3 } from '../math/validation'
-import { REVEAL_SLICE_RANGE, type RevealView, type Stage, nextStage } from './stageConfig'
+import {
+  REVEAL_SLICE_RANGE,
+  type RevealView,
+  type Stage,
+  nextRevealView,
+  nextStage,
+} from './stageConfig'
 
 interface DimensionsState {
   stage: Stage
@@ -134,8 +140,9 @@ export const useDimensionsStore = create<DimensionsState>((set) => ({
 
   setLiveDragVector: (vector) => set({ liveDragVector: vector }),
 
-  toggleRevealView: () =>
-    set((state) => ({ revealView: state.revealView === 'slice' ? 'projection' : 'slice' })),
+  // Task 21: cycles slice -> projection -> chirality -> slice, rather than a binary flip
+  // — see `stageConfig.ts`'s `REVEAL_VIEW_ORDER`/`nextRevealView`.
+  toggleRevealView: () => set((state) => ({ revealView: nextRevealView(state.revealView) })),
 
   rotateRevealXW: (deltaAngle) =>
     set((state) => ({ revealRotationXW: state.revealRotationXW + deltaAngle })),

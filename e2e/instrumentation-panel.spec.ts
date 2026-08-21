@@ -145,7 +145,7 @@ test.describe('live instrumentation panel (Stages 1-3)', () => {
 })
 
 interface RevealState {
-  revealView: 'slice' | 'projection'
+  revealView: 'slice' | 'projection' | 'chirality'
   revealRotationXW: number
   revealRotationYW: number
   revealSliceW0: number

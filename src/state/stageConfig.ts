@@ -2,8 +2,20 @@ export type Stage = 'line' | 'plane' | 'cube' | 'reveal' | 'closing'
 
 export type Axis = 'x' | 'y' | 'z'
 
-/** Stage 4's two ways of rendering the same underlying 4D state — see RevealStage.tsx. */
-export type RevealView = 'slice' | 'projection'
+/**
+ * Stage 4's three lenses onto the same underlying 4D state (see RevealStage.tsx /
+ * ChiralityDemo.tsx) — all driven by the same `revealRotationXW`/`revealRotationYW`/
+ * `revealSliceW0` store fields.
+ */
+export type RevealView = 'slice' | 'projection' | 'chirality'
+
+/** Cycling order for `ui/RevealControls.tsx`'s view toggle — see `nextRevealView`. */
+export const REVEAL_VIEW_ORDER: readonly RevealView[] = ['slice', 'projection', 'chirality']
+
+export function nextRevealView(view: RevealView): RevealView {
+  const index = REVEAL_VIEW_ORDER.indexOf(view)
+  return REVEAL_VIEW_ORDER[(index + 1) % REVEAL_VIEW_ORDER.length]
+}
 
 export interface StageConfig {
   /** axes already spanned by the shape at this stage — the subspace a drag gets validated against */

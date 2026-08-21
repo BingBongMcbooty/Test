@@ -3,6 +3,7 @@ import { CameraControls, type CameraControlsImpl } from '@react-three/drei'
 import { useEffect, useRef } from 'react'
 import { useDimensionsStore } from '../state/store'
 import { ArrowDrag } from './ArrowDrag'
+import { ChiralityDemo } from './ChiralityDemo'
 import { Grid } from './Grid'
 import { RevealDrag } from './RevealDrag'
 import { SliceWarmup } from './SliceWarmup'
@@ -17,6 +18,7 @@ import { RevealStage } from './stages/RevealStage'
 function StageGeometry() {
   const stage = useDimensionsStore((state) => state.stage)
   const revealWarmupActive = useDimensionsStore((state) => state.revealWarmupActive)
+  const revealView = useDimensionsStore((state) => state.revealView)
 
   switch (stage) {
     case 'line':
@@ -28,7 +30,10 @@ function StageGeometry() {
     case 'reveal':
       // Task 20: the cone-slicing warm-up plays first, before the tesseract itself
       // takes over — see `state/store.ts`'s `revealWarmupActive` for how that's gated.
-      return revealWarmupActive ? <SliceWarmup /> : <RevealStage />
+      if (revealWarmupActive) return <SliceWarmup />
+      // Task 21: the chirality demo is a third lens on the same reveal-stage 4D state,
+      // swapped in by `revealView` exactly like the slice/projection swap already was.
+      return revealView === 'chirality' ? <ChiralityDemo /> : <RevealStage />
     // 'closing' gets its own scene in Task 15.
     default:
       return null

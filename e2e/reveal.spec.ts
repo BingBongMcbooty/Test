@@ -13,7 +13,7 @@ interface CanvasPoint {
 }
 
 interface RevealState {
-  revealView: 'slice' | 'projection'
+  revealView: 'slice' | 'projection' | 'chirality'
   revealRotationXW: number
   revealRotationYW: number
   revealSliceW0: number
@@ -158,7 +158,7 @@ test.describe('Stage 4 (reveal): tesseract slicing/projection', () => {
     expect(Math.abs(yRangeAt(0) - yRangeAt(0.6))).toBeGreaterThan(0.1)
   })
 
-  test('the view toggle swaps slice/projection without resetting rotation/slice state', async ({
+  test('the view toggle cycles slice -> projection -> chirality -> slice without resetting rotation/slice state', async ({
     page,
   }) => {
     const errors: string[] = []
@@ -181,12 +181,20 @@ test.describe('Stage 4 (reveal): tesseract slicing/projection', () => {
     await page.screenshot({ path: 'e2e/screenshots/reveal-slice-view.png' })
 
     await toggle.click()
+    await expect(toggle).toHaveText('Show chirality demo')
+    await page.waitForTimeout(100)
+
+    const afterFirstToggle = await revealState(page)
+    expect(afterFirstToggle).toEqual({ ...beforeToggle, revealView: 'projection' })
+    await page.screenshot({ path: 'e2e/screenshots/reveal-projection-view.png' })
+
+    await toggle.click()
     await expect(toggle).toHaveText('Show slice')
     await page.waitForTimeout(100)
 
-    const afterToggle = await revealState(page)
-    expect(afterToggle).toEqual({ ...beforeToggle, revealView: 'projection' })
-    await page.screenshot({ path: 'e2e/screenshots/reveal-projection-view.png' })
+    const afterSecondToggle = await revealState(page)
+    expect(afterSecondToggle).toEqual({ ...beforeToggle, revealView: 'chirality' })
+    await page.screenshot({ path: 'e2e/screenshots/reveal-chirality-view.png' })
 
     await toggle.click()
     await expect(toggle).toHaveText('Show projection')

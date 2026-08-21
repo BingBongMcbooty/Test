@@ -57,13 +57,22 @@ const panelContainerStyle = {
  * 15's distance/orthogonality readouts already use — rather than threading extra derived
  * fields through the store or reading `RevealStage.tsx`'s own render output.
  *
- * Edge count is a real, live number in both views (dynamic 0-12 in slice, fixed 32 in
- * projection — PLAN.md's point is that this *contrast* is itself worth noticing), so it
- * never shows a placeholder. Cross-section extent (slice-only) and distance-from-
- * projection/shadow-scale (projection-only) each read a placeholder in the view that
- * doesn't show them — a real value the current lens isn't showing, a different kind of
- * absence than a structurally locked axis, so it gets different wording than "Unknown,
- * unreachable" per PLAN.md's placeholder vocabulary.
+ * Edge count is a real, live number in both the slice/projection views (dynamic 0-12 in
+ * slice, fixed 32 in projection — PLAN.md's point is that this *contrast* is itself worth
+ * noticing), so it never shows a placeholder there. Cross-section extent (slice-only) and
+ * distance-from-projection/shadow-scale (projection-only) each read a placeholder in the
+ * view that doesn't show them — a real value the current lens isn't showing, a different
+ * kind of absence than a structurally locked axis, so it gets different wording than
+ * "Unknown, unreachable" per PLAN.md's placeholder vocabulary.
+ *
+ * Task 21's chirality view isn't the tesseract at all (`ChiralityDemo.tsx` renders its
+ * own asymmetric shape, not `TESSERACT_VERTICES`), so the tracked-vertex ledger/edge
+ * count/extent/distance rows below — every one of them a fact about the tesseract
+ * specifically — would describe a shape that isn't even on screen. Rotation (xw/yw) and
+ * slice offset (w0) stay shown in every view, though: they're the literal shared state
+ * the player is dragging, same reasoning Task 14's notes give for why a vertical drag
+ * still moves `revealSliceW0` in projection view even though it isn't visually expressed
+ * there either.
  */
 function RevealDimensionPanel() {
   const revealView = useDimensionsStore((state) => state.revealView)
@@ -92,33 +101,41 @@ function RevealDimensionPanel() {
       <div data-testid="dimension-row-rotation-yw">yw: {formatDegrees(revealRotationYW)}</div>
       <div data-testid="dimension-row-slice-w0">w0: {formatNumber(revealSliceW0)}</div>
 
-      <div style={{ marginTop: '0.25rem', color: TRACKED_VERTEX_COLOR }}>tracked vertex</div>
-      <div data-testid="dimension-row-x" style={{ color: TRACKED_VERTEX_COLOR }}>
-        x: {formatNumber(trackedX)}
-      </div>
-      <div data-testid="dimension-row-y" style={{ color: TRACKED_VERTEX_COLOR }}>
-        y: {formatNumber(trackedY)}
-      </div>
-      <div data-testid="dimension-row-z" style={{ color: TRACKED_VERTEX_COLOR }}>
-        z: {formatNumber(trackedZ)}
-      </div>
-      <div data-testid="dimension-row-w" style={{ color: TRACKED_VERTEX_COLOR }}>
-        w: {formatNumber(trackedW)}
-      </div>
+      {revealView === 'chirality' ? (
+        <div data-testid="dimension-chirality-note" style={{ marginTop: '0.25rem', opacity: 0.6 }}>
+          same rotation, a different shape — no tesseract readouts here
+        </div>
+      ) : (
+        <>
+          <div style={{ marginTop: '0.25rem', color: TRACKED_VERTEX_COLOR }}>tracked vertex</div>
+          <div data-testid="dimension-row-x" style={{ color: TRACKED_VERTEX_COLOR }}>
+            x: {formatNumber(trackedX)}
+          </div>
+          <div data-testid="dimension-row-y" style={{ color: TRACKED_VERTEX_COLOR }}>
+            y: {formatNumber(trackedY)}
+          </div>
+          <div data-testid="dimension-row-z" style={{ color: TRACKED_VERTEX_COLOR }}>
+            z: {formatNumber(trackedZ)}
+          </div>
+          <div data-testid="dimension-row-w" style={{ color: TRACKED_VERTEX_COLOR }}>
+            w: {formatNumber(trackedW)}
+          </div>
 
-      <div data-testid="dimension-edge-count" style={{ marginTop: '0.25rem', opacity: 0.75 }}>
-        edges: {edgeCount}
-      </div>
-      <div data-testid="dimension-cross-section-extent" style={{ opacity: 0.75 }}>
-        {revealView === 'slice'
-          ? `Δx:${formatNumber(extentOf('x'))} Δy:${formatNumber(extentOf('y'))} Δz:${formatNumber(extentOf('z'))}`
-          : HIDDEN_BEHIND_SHADOW_LABEL}
-      </div>
-      <div data-testid="dimension-distance-from-projection" style={{ opacity: 0.75 }}>
-        {revealView === 'projection'
-          ? `dist: ${formatNumber(distanceFromProjection)} → ×${formatNumber(shadowScale)}`
-          : SLICED_AWAY_LABEL}
-      </div>
+          <div data-testid="dimension-edge-count" style={{ marginTop: '0.25rem', opacity: 0.75 }}>
+            edges: {edgeCount}
+          </div>
+          <div data-testid="dimension-cross-section-extent" style={{ opacity: 0.75 }}>
+            {revealView === 'slice'
+              ? `Δx:${formatNumber(extentOf('x'))} Δy:${formatNumber(extentOf('y'))} Δz:${formatNumber(extentOf('z'))}`
+              : HIDDEN_BEHIND_SHADOW_LABEL}
+          </div>
+          <div data-testid="dimension-distance-from-projection" style={{ opacity: 0.75 }}>
+            {revealView === 'projection'
+              ? `dist: ${formatNumber(distanceFromProjection)} → ×${formatNumber(shadowScale)}`
+              : SLICED_AWAY_LABEL}
+          </div>
+        </>
+      )}
     </div>
   )
 }
