@@ -39,7 +39,7 @@ Status legend: ⬜ not started · 🔶 in progress · ✅ done
 - ✅ Task 19 — Stage 4 instrumentation (rotation, tracked vertex, live cross-section data) — `claude/task-19-8s8ukz` @ `62d9a83`, merged to default
 
 ## Stage 4 extras *(new session)*
-- ✅ Task 20 — 3D slicing warm-up (into Stage 4) — `claude/task-20-rmpxli` @ (pending commit below), merge to default pending
+- ✅ Task 20 — 3D slicing warm-up (into Stage 4) — `claude/task-20-rmpxli` @ `85ee923`, merged to default
 - ⬜ Task 21 — Chirality / mirror-flip demo
 
 ## Regression & polish *(new session)*
