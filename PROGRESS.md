@@ -1,6 +1,6 @@
 # Progress
 
-**Next up:** Task 23 — Full-playthrough regression test
+**Next up:** Task 23 — Camera resistance/spring-back everywhere, instead of a per-stage hard lock
 
 Status legend: ⬜ not started · 🔶 in progress · ✅ done
 
@@ -44,9 +44,16 @@ Status legend: ⬜ not started · 🔶 in progress · ✅ done
 
 ## Regression & polish *(new session)*
 - ✅ Task 22 — Closing beat + restart — `claude/task-22-w9vvzb` @ `5da0174`, merged to default
-- ⬜ Task 23 — Full-playthrough regression test
-- ⬜ Task 24 — Visual/tone polish *(optional)*
-- ⬜ Task 25 — Deploy *(optional)*
+
+## Playtest follow-ups *(new session each — inserted after a direct user playtest of the Task 22 build; see PLAN.md's three new "post-Task-22" locked-decision rows and rationale paragraphs for what they lock in)*
+- ⬜ Task 23 — Camera resistance/spring-back everywhere, instead of a per-stage hard lock
+- ⬜ Task 24 — Instrumentation panel redesign: cursor-tracking, plain-language-first, richer per-stage data
+- ⬜ Task 25 — Dimension-growth transitions between stages, and the "can't grow into the 4th, but here's its shadow" beat
+
+## Regression & polish *(new session)*
+- ⬜ Task 26 — Full-playthrough regression test
+- ⬜ Task 27 — Visual/tone polish *(optional)*
+- ⬜ Task 28 — Deploy *(optional)*
 
 ## Notes / deviations from PLAN.md
 
@@ -199,3 +206,7 @@ _(Add anything here that changed from the original plan as you go — tuned para
 - **Task 22:** Verified via `npm test` (100/100), `npm run lint`, `npm run build`, and the full Playwright suite (36/36 — no pre-existing flakes surfaced this run, unlike Task 21's session; possibly environment-dependent per that task's own note on `richness.spec.ts`'s frame-rate floor). Also did a manual `npm run dev`-equivalent visual check via a throwaway (uncommitted, deleted after) Playwright script/screenshot confirming the button placement fix and the closing screen's overall look (reviewed the image directly, not just asserted-in-test).
 
 **Context-window check-in:** Task 22 was a short, single-focus session — read PROGRESS.md/PLAN.md's Task 22 section, explored the existing store/stage-config/UI-component patterns (confirmed `advanceStage`/`reset`/the `'closing'` stage/its camera framing already existed from earlier tasks), implemented two small new components plus three small edits, fixed one placement bug caught by an actual screenshot, and wrote/ran tests. No auto-summarization occurred; this was well within a single context window. The next session should start fresh from Task 23 (full-playthrough regression test).
+
+- **Planning session (after Task 22, playtest + a small prototype flag, minimal code changed):** started as a request to test the current build — that surfaced a stale-branch issue worth recording separately (see below), and once re-tested against the real Task 22 tip, the user played it directly and gave four pieces of feedback. Three are sized as new tasks, inserted between Task 22 and the original Task 23 (renumbering the original Tasks 23-25 to 26-28 — same "insert before not-yet-started work" pattern as every prior insertion in this doc): **Task 23** (camera D-pad controls become available on every stage, including the currently-locked Stage 1, but with resistance/spring-back on stages that don't structurally support free movement, instead of either a hard clamp or no buttons at all), **Task 24** (a substantial instrumentation-panel redesign — continuous cursor tracking instead of drag-gated, plain-language labels leading with the math notation demoted to subtext, and richer per-stage live data: a cursor-projection dot on Stage 1's line, live x/y cursor position on Stage 2, and a Task-19-style tracked vertex on Stage 3 replacing the current post-drag decomposition percentages), and **Task 25** (a growth animation connecting Stage 1→2 and Stage 2→3, explicitly *not* played across Stage 3→Reveal, where new copy explains that a 4th dimension can't be grown into the way the first three could — but its shadow, via Task 14's existing projection view, can still be seen). See PLAN.md's three new "post-Task-22" locked-decision rows, their three rationale paragraphs, and each task's own deliverable/tunable text for the full detail — not duplicated here. The fourth piece of feedback (below) was small enough to act on immediately rather than defer.
+- **Planning session — stale-branch issue found and fixed, not part of the four feedback items:** the session that ran Task 22 had, by the time this session started, left the local working branch pointed at the pre-Task-16 tip (`78b086e`) even though `origin/claude/dimensional-exploration-app-uj20jy` (the actual default branch) was already 7 commits ahead at `de6dac6` (through Task 22) — a `claude/task-22-w9vvzb` branch existed at the exact same SHA as the default branch tip, confirming Task 22 itself *had* been merged back correctly; the problem was purely this session's local checkout being stale, not a repeat of the "work stranded on an unmerged branch" failure mode CLAUDE.md's step 1 already warns about. First-pass testing was done against the stale `78b086e` tip and reported to the user as if it were current — caught only because the user said "I don't think you have the right build," not because the session's own reconciliation step caught it. Root cause: `git status`/`git log` were checked locally without ever running `git fetch`/`git ls-remote` against the specific default branch first, so a stale local ref never got the chance to look stale. Fixed by fetching every `claude/*` branch and fast-forwarding local to `origin`'s real tip before re-testing. Worth restating plainly for a future session even though CLAUDE.md's step 1 already says this: checking `git log` on the branch you were handed tells you nothing about whether that branch is current — only a fetch against the remote does.
+- **Task 21 prototype flag (small, done immediately rather than deferred):** the user, after playing the chirality demo, called `ChiralityDemo.tsx`'s box-and-cylinder hand a placeholder that "sucks" and needs serious rework later, but asked for it to be *marked* as a prototype right now rather than rebuilt now. Added `ui/ChiralityPrototypeBadge.tsx` (a small top-left overlay, the one screen corner Task 22's own placement notes confirm nothing else on the reveal stage claims — visible only when `revealView === 'chirality'`) plus doc-comment flags in `math/chirality.ts` and a Task 21 tunables note in PLAN.md pointing at Task 27 (visual/tone polish, renumbered from the original Task 24) as where the real remodel should happen. No math/behavior changed — `npm run lint` and a manual browser check (screenshot, badge renders with no collisions) both confirmed clean.

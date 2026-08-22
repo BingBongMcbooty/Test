@@ -6,6 +6,13 @@
  * through `fourd.ts`'s `applyRevealRotation`/`projectTo3D` verbatim, the same functions
  * (and the same `revealRotationXW`/`revealRotationYW` store state) already driving the
  * tesseract — only this module's part list is new.
+ *
+ * PROTOTYPE — flagged by direct user request after playing the Task 22 build: this part
+ * list is a placeholder standing in for a real hand model, good enough to prove the
+ * mirror-flip math (see the asymmetry note below) but not the shape this demo should
+ * ship with. A future task should replace it with a smoothly modeled glove/hand — see
+ * PLAN.md's tunables note. `ui/ChiralityPrototypeBadge.tsx` surfaces this on-screen so
+ * it isn't mistaken for finished work in the meantime.
  */
 import type { Vec4 } from './fourd'
 

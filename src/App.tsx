@@ -1,5 +1,6 @@
 import { Experience } from './scene/Experience'
 import { CameraDirectionalControls } from './ui/CameraDirectionalControls'
+import { ChiralityPrototypeBadge } from './ui/ChiralityPrototypeBadge'
 import { ClosingBeat } from './ui/ClosingBeat'
 import { ClosingContinue } from './ui/ClosingContinue'
 import { CubeFeedback } from './ui/CubeFeedback'
@@ -19,6 +20,7 @@ function App() {
       <CubeFeedback />
       <StageContinue />
       <RevealControls />
+      <ChiralityPrototypeBadge />
       <SliceWarmupControls />
       <ClosingContinue />
       <ClosingBeat />
