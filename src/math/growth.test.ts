@@ -5,6 +5,8 @@ import {
   GROWTH_MAX_CORNER,
   boxWireframeEdges,
   easeGrowth,
+  easeGrowthFlashy,
+  growthFlashIntensity,
   lerpCorner,
 } from './growth'
 
@@ -74,6 +76,51 @@ describe('easeGrowth', () => {
     expect(easeGrowth(0.1)).toBeLessThan(0.1) // slow start: behind a linear ramp early on
     expect(easeGrowth(0.9)).toBeGreaterThan(0.9) // slow finish: ahead of a linear ramp late on
     expect(easeGrowth(0.3) + easeGrowth(0.7)).toBeCloseTo(1, 10) // symmetric around the midpoint
+  })
+})
+
+describe('easeGrowthFlashy', () => {
+  it('maps 0 to 0 and 1 to 1, same as easeGrowth', () => {
+    // toBeCloseTo, not toBe: the cubic/quadratic terms' floating-point rounding at the
+    // exact boundary lands a hair off zero (~2e-16), unlike easeGrowth's simpler
+    // polynomial which happens to land on exact 0/1.
+    expect(easeGrowthFlashy(0)).toBeCloseTo(0, 10)
+    expect(easeGrowthFlashy(1)).toBeCloseTo(1, 10)
+  })
+
+  it('clamps out-of-range input rather than overshooting off the [0,1] input domain', () => {
+    expect(easeGrowthFlashy(-1)).toBeCloseTo(0, 10)
+    expect(easeGrowthFlashy(2)).toBeCloseTo(1, 10)
+  })
+
+  it('overshoots above 1 partway through, unlike the plain smoothstep easeGrowth', () => {
+    expect(easeGrowthFlashy(0.6)).toBeGreaterThan(1)
+    expect(easeGrowth(0.6)).toBeLessThanOrEqual(1)
+  })
+
+  it('settles back down to exactly 1 by the end, not left overshot', () => {
+    expect(easeGrowthFlashy(0.99)).toBeGreaterThan(0.9)
+    expect(easeGrowthFlashy(1)).toBe(1)
+  })
+})
+
+describe('growthFlashIntensity', () => {
+  it('is 0 at both endpoints', () => {
+    expect(growthFlashIntensity(0)).toBe(0)
+    expect(growthFlashIntensity(1)).toBe(0)
+  })
+
+  it('peaks at exactly 1 at the midpoint', () => {
+    expect(growthFlashIntensity(0.5)).toBe(1)
+  })
+
+  it('is symmetric around the midpoint', () => {
+    expect(growthFlashIntensity(0.3)).toBeCloseTo(growthFlashIntensity(0.7), 10)
+  })
+
+  it('clamps out-of-range input', () => {
+    expect(growthFlashIntensity(-1)).toBe(0)
+    expect(growthFlashIntensity(2)).toBe(0)
   })
 })
 

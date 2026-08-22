@@ -55,6 +55,48 @@ export function easeGrowth(t: number): number {
   return clamped * clamped * (3 - 2 * clamped)
 }
 
+/**
+ * "Back" ease-out (overshoot) — a flashier alternative to `easeGrowth` above, used for
+ * the growth transition's actual geometry (`StageGrowthTransition.tsx`) after direct
+ * user feedback that the plain smoothstep version, even slowed to `GROWTH_DURATION`'s
+ * 2.5s, still read as too quiet: "not seamless enough… they should feel flashy." Eases
+ * in, overshoots the destination corner by roughly 10% partway through, then springs
+ * back to settle exactly at 1 — the shape visibly grows slightly past its final size
+ * and bounces back, instead of smoothstep's purely monotonic glide to a stop. Standard
+ * "easeOutBack" constants (`c1 = 1.70158`, `c3 = c1 + 1`).
+ *
+ * Deliberately a new function rather than a change to `easeGrowth`: Task 25's own notes
+ * already document a real regression from a *different* kind of alternate curve (a
+ * front-loaded ease-out that made the animation look already-finished a third of the
+ * way through) — keeping both curves named and separate makes it easy to tell which one
+ * is actually in use if a future playtest finds a problem with either.
+ */
+const BACK_C1 = 1.70158
+const BACK_C3 = BACK_C1 + 1
+export function easeGrowthFlashy(t: number): number {
+  const clamped = Math.min(1, Math.max(0, t))
+  const shifted = clamped - 1
+  return 1 + BACK_C3 * shifted ** 3 + BACK_C1 * shifted ** 2
+}
+
+/**
+ * 0 -> 1 -> 0 parabola, peaking exactly at the animation's midpoint — drives the growth
+ * transition's color-flash pulse (`StageGrowthTransition.tsx`): the wireframe's color
+ * lerps from its resting tone toward a bright accent as this rises, then back to resting
+ * as it falls, timed off the same linear (not overshoot-eased) progress ratio the
+ * geometry's `easeGrowthFlashy` input already uses, rather than a second independent clock.
+ */
+export function growthFlashIntensity(t: number): number {
+  const clamped = Math.min(1, Math.max(0, t))
+  return 4 * clamped * (1 - clamped)
+}
+
+/** The wireframe's resting color, outside of a flash pulse — Task 25's original choice. */
+export const GROWTH_REST_COLOR = '#e5e4e7'
+
+/** The bright accent color a growth transition's color-flash pulse lerps toward. */
+export const GROWTH_FLASH_COLOR = '#ffe9b3'
+
 /** Always exactly 12 — see `boxWireframeEdges`'s doc comment for why this never varies. */
 export const GROWTH_EDGE_COUNT = 12
 

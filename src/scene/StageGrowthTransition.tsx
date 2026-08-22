@@ -1,13 +1,16 @@
 import { useEffect, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
-import { BufferAttribute, BufferGeometry } from 'three'
+import { BufferAttribute, BufferGeometry, Color, type LineBasicMaterial } from 'three'
 import {
   GROWTH_DURATION,
   GROWTH_EDGE_COUNT,
+  GROWTH_FLASH_COLOR,
   GROWTH_MAX_CORNER,
   GROWTH_MAX_FRAME_DELTA,
+  GROWTH_REST_COLOR,
   boxWireframeEdges,
-  easeGrowth,
+  easeGrowthFlashy,
+  growthFlashIntensity,
   lerpCorner,
 } from '../math/growth'
 import { useDimensionsStore } from '../state/store'
@@ -34,6 +37,11 @@ growthGeometry.setAttribute(
   new BufferAttribute(new Float32Array(GROWTH_EDGE_COUNT * 2 * 3), 3),
 )
 
+// Scratch `Color`s, reused every frame rather than allocated fresh — `restColor.lerp`
+// below mutates a copy of this, never these originals.
+const restColor = new Color(GROWTH_REST_COLOR)
+const flashColor = new Color(GROWTH_FLASH_COLOR)
+
 /**
  * Task 25: plays the Stage 1->2 / 2->3 growth animation — the existing shape visibly
  * extending into the next stage's shape (the line sweeping out a perpendicular edge to
@@ -45,6 +53,13 @@ growthGeometry.setAttribute(
  * case: every stage change *except* a real player-driven line->plane or plane->cube
  * advance — see `state/store.ts`'s `advanceStage`).
  *
+ * Post-launch playtest feedback ("not seamless enough… they should feel flashy") added
+ * two things on top of Task 25's original plain-smoothstep version: the box corner now
+ * interpolates on `easeGrowthFlashy`'s overshoot-and-spring-back curve instead of a
+ * purely monotonic glide, and the wireframe's own color pulses toward a bright accent
+ * (`GROWTH_FLASH_COLOR`) and back via `growthFlashIntensity`, both driven off the same
+ * per-frame progress rather than a second independent animation clock.
+ *
  * `scene/Experience.tsx`'s `StageGeometry` is the other half of this: it suppresses
  * the destination stage's own normal component for exactly as long as this one is
  * rendering, so the two never show at once (which would either double the outline or,
@@ -55,6 +70,7 @@ export function StageGrowthTransition() {
   const growthTransition = useDimensionsStore((state) => state.growthTransition)
   const finishGrowthTransition = useDimensionsStore((state) => state.finishGrowthTransition)
   const elapsedRef = useRef(0)
+  const materialRef = useRef<LineBasicMaterial>(null)
 
   // A fresh growth transition (a new `{ from, to }` object identity, set once per
   // advance) restarts the animation clock from zero.
@@ -66,11 +82,15 @@ export function StageGrowthTransition() {
     if (!growthTransition) return
 
     elapsedRef.current += Math.min(delta, GROWTH_MAX_FRAME_DELTA)
-    const t = easeGrowth(elapsedRef.current / GROWTH_DURATION)
+    // Linear (unclamped-overshoot) progress drives the finish check and the color-flash
+    // curve, which is only meaningful over [0, 1]; the geometry itself uses the
+    // overshoot-eased value, which can briefly exceed 1.
+    const rawT = Math.min(1, elapsedRef.current / GROWTH_DURATION)
+    const poppedT = easeGrowthFlashy(rawT)
     const maxCorner = lerpCorner(
       GROWTH_MAX_CORNER[growthTransition.from as 'line' | 'plane'],
       GROWTH_MAX_CORNER[growthTransition.to as 'plane' | 'cube'],
-      t,
+      poppedT,
     )
     const edges = boxWireframeEdges(maxCorner)
     const positions = growthGeometry.attributes.position as BufferAttribute
@@ -80,6 +100,9 @@ export function StageGrowthTransition() {
     })
     positions.needsUpdate = true
 
+    const material = materialRef.current
+    if (material) material.color.copy(restColor).lerp(flashColor, growthFlashIntensity(rawT))
+
     if (elapsedRef.current >= GROWTH_DURATION) finishGrowthTransition()
   })
 
@@ -87,7 +110,7 @@ export function StageGrowthTransition() {
 
   return (
     <lineSegments geometry={growthGeometry}>
-      <lineBasicMaterial color="#e5e4e7" />
+      <lineBasicMaterial ref={materialRef} color={GROWTH_REST_COLOR} />
     </lineSegments>
   )
 }
