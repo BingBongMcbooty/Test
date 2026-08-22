@@ -1,4 +1,5 @@
 import { test, expect, type Page, type Locator } from '@playwright/test'
+import { PLANE_TILT_RANGE } from '../src/scene/cameraFraming'
 
 // three.js renders with `preserveDrawingBuffer: false`, so `canvas.toDataURL()` can
 // read back stale/blank pixels regardless of what's actually on screen. A compositor
@@ -184,7 +185,7 @@ test.describe('camera controls (Task 17: on-screen buttons, no mouse-drag orbit 
     await page.screenshot({ path: 'e2e/screenshots/orbit-cube-angle-3.png' })
   })
 
-  test('Stage 1 (line): no camera buttons are offered, and dragging off the line does nothing', async ({
+  test('Stage 1 (line): camera buttons render, nudge the camera on press, and spring back close to dead-on rest after release', async ({
     page,
   }) => {
     const errors: string[] = []
@@ -194,21 +195,49 @@ test.describe('camera controls (Task 17: on-screen buttons, no mouse-drag orbit 
     await expect(page.locator('canvas')).toBeVisible()
     await page.waitForTimeout(300)
 
-    await expect(page.getByTestId('camera-controls')).not.toBeVisible()
+    // Task 23: buttons now render on every stage, including Stage 1 — previously the
+    // only stage with none at all (a hard lock, indistinguishable to the player from
+    // "there's nothing to press").
+    await expect(page.getByTestId('camera-controls')).toBeVisible()
 
-    const before = await getCameraState(page)
+    const rest = await waitForCameraSettled(page)
+    expect(rest.azimuthAngle).toBeCloseTo(0, 5)
+    expect(rest.polarAngle).toBeCloseTo(Math.PI / 2, 5)
+    const before = await canvasSnapshot(page)
+
+    // Hold the button down (not a quick click) so a mid-press read/screenshot lands
+    // while the camera is genuinely still nudged off rest, before any spring-back has
+    // had a chance to run — proves pressing actually does something here now, not
+    // just that the button exists.
+    const rightButton = page.getByTestId('camera-control-right')
+    await rightButton.hover()
+    await page.mouse.down()
+    await page.waitForTimeout(250)
+    const midPress = await getCameraState(page)
+    expect(midPress.azimuthAngle).not.toBeCloseTo(rest.azimuthAngle, 3)
+    const midPressShot = await canvasSnapshot(page)
+    expect(midPressShot).not.toEqual(before)
+    await page.mouse.up()
+
+    // Task 23's own verify step: azimuth/polar settle back close to the dead-on rest
+    // values within a bounded time after release — a spring-back, not a value stuck
+    // wherever the press left it.
+    const settled = await waitForCameraSettled(page)
+    expect(settled.azimuthAngle).toBeCloseTo(0, 2)
+    expect(settled.polarAngle).toBeCloseTo(Math.PI / 2, 2)
+
+    // Mouse-drag still never orbits the camera anywhere, unrelated to the buttons
+    // above (Task 17's guarantee, unaffected by Task 23).
+    const beforeDrag = await getCameraState(page)
     const corner = await canvasCorner(page)
-    // Off-object, same corner-start every other stage's collider never reaches — mouse
-    // drag never orbits the camera anywhere anymore (Task 17), so this should be a
-    // complete no-op regardless of stage.
     await dragFrom(page, corner, -800, 400)
-    const after = await getCameraState(page)
-    expect(after).toEqual(before)
+    const afterDrag = await getCameraState(page)
+    expect(afterDrag).toEqual(beforeDrag)
 
     expect(errors).toEqual([])
   })
 
-  test('Stage 2 (plane): camera buttons rotate within a limited range; dragging off the plane does nothing', async ({
+  test('Stage 2 (plane): camera buttons show resistance-then-settle past the tilt boundary, not a hard clamp; dragging off the plane does nothing', async ({
     page,
   }) => {
     const errors: string[] = []
@@ -235,13 +264,25 @@ test.describe('camera controls (Task 17: on-screen buttons, no mouse-drag orbit 
     const afterDrag = await getCameraState(page)
     expect(afterDrag).toEqual(dead0n)
 
-    // The buttons do work, but only within PLANE_TILT_RANGE (see cameraFraming.ts) —
-    // many more clicks than needed to reach the limit should still clamp there rather
-    // than spinning freely like Stage 3+.
-    await clickRepeatedly(page.getByTestId('camera-control-right'), 12)
-    const tilted = await waitForCameraSettled(page)
-    expect(tilted.azimuthAngle).toBeCloseTo(1.0, 2) // PLANE_TILT_RANGE
-    expect(tilted.azimuthAngle).not.toBeCloseTo(dead0n.azimuthAngle, 2)
+    // Task 23: a *sustained* hold (not quick clicks) keeps issuing new resisted
+    // targets every repeat tick — a true hard clamp could never read higher than
+    // PLANE_TILT_RANGE even mid-press, but resistance can, just increasingly
+    // reluctantly the further past it the camera already is (see `resistedStep`).
+    const rightButton = page.getByTestId('camera-control-right')
+    await rightButton.hover()
+    await page.mouse.down()
+    await page.waitForTimeout(1500)
+    const midHold = await getCameraState(page)
+    await page.mouse.up()
+    expect(midHold.azimuthAngle).toBeGreaterThan(PLANE_TILT_RANGE)
+
+    // ...but once released it settles back down to the tilt boundary, not staying
+    // wherever the hold pushed it past it — the resistance's "give" isn't a new
+    // permanent range, it eases back to the same edge a hard clamp would have stopped
+    // at outright.
+    const settled = await waitForCameraSettled(page)
+    expect(settled.azimuthAngle).toBeCloseTo(PLANE_TILT_RANGE, 2)
+    expect(settled.azimuthAngle).not.toBeCloseTo(dead0n.azimuthAngle, 2)
 
     expect(errors).toEqual([])
   })

@@ -1,5 +1,6 @@
+import type { CameraControlsImpl } from '@react-three/drei'
 import { cameraControlsRef } from '../scene/cameraControlsRef'
-import { CAMERA_FRAMING } from '../scene/cameraFraming'
+import { CAMERA_FRAMING, resistedStep, type CameraFraming } from '../scene/cameraFraming'
 import { useDimensionsStore } from '../state/store'
 
 /** Radians per button click/hold-tick — button-driven equivalent of a mouse-drag's sensitivity. */
@@ -11,22 +12,74 @@ const HOLD_REPEAT_MS = 90
 
 type RotateDirection = 'left' | 'right' | 'up' | 'down'
 
-function rotate(direction: RotateDirection) {
+/**
+ * Task 23: `resistedStep` needs the angle the camera is actually *heading toward*, not
+ * the live, still-damping-toward-it value `controls.azimuthAngle`/`.polarAngle`
+ * report. `camera-controls`' own `rotate(delta, ..., true)` adds `delta` to its
+ * internal pending target (an unexposed private field), not to the live value — so
+ * during a sustained hold, where repeat ticks (every `HOLD_REPEAT_MS`) fire faster
+ * than the damped transition can catch up, reading the lagging live value as "current"
+ * makes resistance under-count how far out the pending target already is, letting
+ * repeated presses run away almost entirely un-resisted (confirmed by an actual
+ * `npm run dev` look — see PROGRESS.md's Task 23 notes). These two module-level values
+ * track that pending target ourselves instead: resynced from the live value whenever
+ * `controls.active` reports no transition is currently in flight (the one moment live
+ * *is* the pending target, so it's safe to trust), and advanced by exactly the
+ * resisted delta actually applied otherwise, so they stay exactly in step with the
+ * library's own real internal target throughout an arbitrarily long hold.
+ */
+let pendingAzimuth: number | null = null
+let pendingPolar: number | null = null
+
+function targetAzimuth(controls: CameraControlsImpl): number {
+  if (!controls.active) pendingAzimuth = controls.azimuthAngle
+  return pendingAzimuth ?? controls.azimuthAngle
+}
+
+function targetPolar(controls: CameraControlsImpl): number {
+  if (!controls.active) pendingPolar = controls.polarAngle
+  return pendingPolar ?? controls.polarAngle
+}
+
+/**
+ * The raw `ROTATE_STEP` is run through `resistedStep` against the current stage's
+ * `azimuthRange`/`polarRange` before being applied — inside that range this is a no-op
+ * (full step, exactly Task 17's behavior), outside it the step shrinks the further out
+ * the camera's tracked target already is (see `targetAzimuth`/`targetPolar` above for
+ * why that's tracked rather than read live).
+ */
+function rotate(direction: RotateDirection, framing: CameraFraming) {
   const controls = cameraControlsRef.current
   if (!controls) return
   switch (direction) {
-    case 'left':
-      controls.rotate(-ROTATE_STEP, 0, true)
+    case 'left': {
+      const current = targetAzimuth(controls)
+      const step = resistedStep(current, -ROTATE_STEP, framing.azimuthRange)
+      controls.rotate(step, 0, true)
+      pendingAzimuth = current + step
       break
-    case 'right':
-      controls.rotate(ROTATE_STEP, 0, true)
+    }
+    case 'right': {
+      const current = targetAzimuth(controls)
+      const step = resistedStep(current, ROTATE_STEP, framing.azimuthRange)
+      controls.rotate(step, 0, true)
+      pendingAzimuth = current + step
       break
-    case 'up':
-      controls.rotate(0, -ROTATE_STEP, true)
+    }
+    case 'up': {
+      const current = targetPolar(controls)
+      const step = resistedStep(current, -ROTATE_STEP, framing.polarRange)
+      controls.rotate(0, step, true)
+      pendingPolar = current + step
       break
-    case 'down':
-      controls.rotate(0, ROTATE_STEP, true)
+    }
+    case 'down': {
+      const current = targetPolar(controls)
+      const step = resistedStep(current, ROTATE_STEP, framing.polarRange)
+      controls.rotate(0, step, true)
+      pendingPolar = current + step
       break
+    }
   }
 }
 
@@ -84,19 +137,25 @@ function RepeatButton({ testId, label, onFire }: RepeatButtonProps) {
 
 /**
  * Task 17: on-screen camera controls, replacing mouse-drag-to-orbit everywhere it used
- * to exist. Renders only on stages where `cameraFraming.ts` marks
- * `cameraControlsEnabled` — Stage 1 (line) never gets it at all (see that field's doc
- * comment for why), Stage 2 (plane) gets a deliberately limited tilt
- * (`PLANE_TILT_RANGE`), Stage 3 on gets the original unclamped free-orbit range.
- * Drives the single shared `CameraControls` instance via `cameraControlsRef` — a plain
- * module ref rather than store state, since these are one-shot imperative nudges
- * (`.rotate()`/`.dolly()`), not values anything needs to read back reactively.
+ * to exist. Drives the single shared `CameraControls` instance via `cameraControlsRef`
+ * — a plain module ref rather than store state, since these are one-shot imperative
+ * nudges (`.rotate()`/`.dolly()`), not values anything needs to read back reactively.
+ *
+ * Task 23: renders on *every* stage now, including Stage 1 (previously the only stage
+ * with no buttons at all). What used to be a hard per-stage clamp
+ * (`cameraFraming.ts`'s old `cameraControlsEnabled`/absolute `azimuthRange`/
+ * `polarRange` passed straight to `CameraControls`' own `minAzimuthAngle`/etc.) is now
+ * resistance-with-spring-back instead: `rotate()` above runs every step through
+ * `resistedStep` against the current stage's (still-named) `azimuthRange`/
+ * `polarRange`, and `Experience.tsx`'s `CameraRig` eases the camera back toward that
+ * range whenever it's left outside it. Stage 1's range is zero-width, so it faces
+ * resistance (and springs back) on any movement at all; Stage 2 keeps
+ * `PLANE_TILT_RANGE`'s free zone; Stage 3 on is unaffected — an unclamped range makes
+ * both mechanisms permanent no-ops there, identical to Task 17's original behavior.
  */
 export function CameraDirectionalControls() {
   const stage = useDimensionsStore((state) => state.stage)
-  const { cameraControlsEnabled } = CAMERA_FRAMING[stage]
-
-  if (!cameraControlsEnabled) return null
+  const framing = CAMERA_FRAMING[stage]
 
   return (
     <div
@@ -120,13 +179,25 @@ export function CameraDirectionalControls() {
         }}
       >
         <div />
-        <RepeatButton testId="camera-control-up" label="▲" onFire={() => rotate('up')} />
+        <RepeatButton testId="camera-control-up" label="▲" onFire={() => rotate('up', framing)} />
         <div />
-        <RepeatButton testId="camera-control-left" label="◀" onFire={() => rotate('left')} />
+        <RepeatButton
+          testId="camera-control-left"
+          label="◀"
+          onFire={() => rotate('left', framing)}
+        />
         <div />
-        <RepeatButton testId="camera-control-right" label="▶" onFire={() => rotate('right')} />
+        <RepeatButton
+          testId="camera-control-right"
+          label="▶"
+          onFire={() => rotate('right', framing)}
+        />
         <div />
-        <RepeatButton testId="camera-control-down" label="▼" onFire={() => rotate('down')} />
+        <RepeatButton
+          testId="camera-control-down"
+          label="▼"
+          onFire={() => rotate('down', framing)}
+        />
         <div />
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
