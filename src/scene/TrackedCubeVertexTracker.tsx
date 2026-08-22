@@ -52,14 +52,22 @@ export function TrackedCubeVertexTracker() {
   const stage = useDimensionsStore((state) => state.stage)
   const camera = useThree((state) => state.camera)
   const setTrackedCubeVertexCamera = useDimensionsStore((state) => state.setTrackedCubeVertexCamera)
+  // Task 25: while the cube is still mid-`StageGrowthTransition` (the plane->cube
+  // growth animation), the corner this marker sits on hasn't actually finished growing
+  // into place yet — showing the marker (and feeding the panel a reading for it) before
+  // then would highlight a point on a shape that visually isn't fully there. Same
+  // `growthTransition.to === stage` reasoning `scene/Experience.tsx`'s `StageGeometry`
+  // and `ArrowDrag.tsx`'s collider gating already use.
+  const growthTransition = useDimensionsStore((state) => state.growthTransition)
+  const active = stage === 'cube' && !growthTransition
   const lastRef = useRef<Vec3Like | null>(null)
 
   useEffect(() => {
-    if (stage !== 'cube') {
+    if (!active) {
       lastRef.current = null
       setTrackedCubeVertexCamera(null)
     }
-  }, [stage, setTrackedCubeVertexCamera])
+  }, [active, setTrackedCubeVertexCamera])
 
   // Only actually writes to the store when the reading has moved beyond
   // `CHANGE_EPSILON` (or on the very first frame this stage) — the camera sits still
@@ -68,14 +76,14 @@ export function TrackedCubeVertexTracker() {
   // stage whose shader material (Task 7) is already the heaviest thing in the scene —
   // see `e2e/richness.spec.ts`'s frame-rate floor.
   useFrame(() => {
-    if (stage !== 'cube') return
+    if (!active) return
     const next = toCameraRelative(TRACKED_CUBE_VERTEX_WORLD, camera)
     if (lastRef.current && roughlyEqual(lastRef.current, next)) return
     lastRef.current = next
     setTrackedCubeVertexCamera(next)
   })
 
-  if (stage !== 'cube') return null
+  if (!active) return null
 
   return (
     <mesh geometry={markerGeometry} position={TRACKED_CUBE_VERTEX_WORLD}>

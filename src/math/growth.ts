@@ -1,0 +1,134 @@
+/**
+ * Task 25: shared math for the Stage 1->2 / 2->3 growth-transition animation
+ * (`scene/StageGrowthTransition.tsx`) — one small utility rather than bespoke code at
+ * each boundary, since both transitions are the same underlying idea: the existing
+ * shape's flat outline extrudes one further axis to become the next stage's shape.
+ *
+ * Every one of Stages 1-3's shapes (`scene/shapePositions.ts`, positioned into the
+ * positive octant by Task 16) shares one corner pinned at the world origin, so an
+ * axis-aligned box with `min = (0,0,0)` and a per-stage `max` corner exactly describes
+ * all three: the line degenerates to a box with two zero-length sides
+ * (`max = (3,0,0)`), the plane to one zero-length side (`max = (3,3,0)`), and the cube
+ * is a real box (`max = (2.5,2.5,2.5)`). Interpolating just the `max` corner between
+ * two stages' own values, then drawing that box's 12-edge wireframe every frame, is
+ * what makes one function serve both the 1->2 "sweep out a perpendicular edge"
+ * transition and the 2->3 "extrude into a cube" transition without a special case for
+ * either — the degenerate start/end shapes fall out of the same box-wireframe logic
+ * automatically, and the 2->3 transition's incidental base resize (the plane's 3x3
+ * outline settling down to the cube's 2.5x2.5 footprint) reads as part of the same
+ * continuous grow/extrude motion rather than a separate step.
+ *
+ * `GROWTH_MAX_CORNER`'s values are read off `scene/stages/LineStage.tsx` (a length-3
+ * segment), `PlaneStage.tsx` (`PlaneGeometry(3, 3)`), and `CubeStage.tsx`
+ * (`BoxGeometry(2.5, 2.5, 2.5)`) rather than imported from one shared constant —
+ * deliberately duplicated, not refactored out of those already-shipped, already-tested
+ * files, to keep this task's change footprint to new files plus the store/HUD/
+ * scene-router wiring needed to play the animation. If any of those three geometries'
+ * sizes ever change, update the matching entry below to match.
+ */
+
+export type Corner = readonly [number, number, number]
+
+/** Componentwise linear interpolation between two corner points. */
+export function lerpCorner(from: Corner, to: Corner, t: number): Corner {
+  return [
+    from[0] + (to[0] - from[0]) * t,
+    from[1] + (to[1] - from[1]) * t,
+    from[2] + (to[2] - from[2]) * t,
+  ]
+}
+
+/**
+ * Clamped smoothstep (`3t²-2t³`) — eases in, moves fastest through the middle, eases
+ * out. A first pass used a cubic ease-*out* (fast start, gentle settle) instead, on the
+ * assumption that would read as something actively extending itself — checked by eye
+ * against real screenshots (see PROGRESS.md), and it backfired: ease-out is so heavily
+ * front-loaded that the shape reads as "basically already grown" by roughly a third of
+ * the way through the duration, with only an imperceptible sliver left to visibly
+ * creep afterward — closer to an instant pop-in with a slow tail than a growth the
+ * player can actually watch happen. Smoothstep keeps visible motion spread across
+ * (almost) the whole duration instead, which is what a "watch this sweep/extrude"
+ * animation actually needs.
+ */
+export function easeGrowth(t: number): number {
+  const clamped = Math.min(1, Math.max(0, t))
+  return clamped * clamped * (3 - 2 * clamped)
+}
+
+/** Always exactly 12 — see `boxWireframeEdges`'s doc comment for why this never varies. */
+export const GROWTH_EDGE_COUNT = 12
+
+/**
+ * The 12 edges of an axis-aligned box with one corner at the world origin and the
+ * opposite corner at `max`, as an array of `[start, end]` point pairs — always exactly
+ * `GROWTH_EDGE_COUNT` entries, even when `max` has a zero component, so a
+ * `BufferGeometry` built from this never has to resize its attribute over the course
+ * of an animation. A zero component degenerates 4 of the 12 edges to zero-length
+ * segments (harmless — they simply don't render) and collapses the remaining 8 into
+ * the 4-edge outline of a flat rectangle: at `max = (3,0,0)` this is exactly Stage 1's
+ * line, at `max = (3,3,0)` exactly Stage 2's square outline, at `max = (2.5,2.5,2.5)` a
+ * full 12-edge cube — matching `state/stageConfig.ts`'s `STAGE_SHAPE_COUNTS` edge
+ * counts (1, 4, 12) exactly, which is what makes this one function double as both the
+ * animation's in-between frames and its exact start/end poses.
+ */
+export function boxWireframeEdges(max: Corner): readonly (readonly [Corner, Corner])[] {
+  const [x, y, z] = max
+  const o: Corner = [0, 0, 0]
+  const cx: Corner = [x, 0, 0]
+  const cy: Corner = [0, y, 0]
+  const cz: Corner = [0, 0, z]
+  const cxy: Corner = [x, y, 0]
+  const cxz: Corner = [x, 0, z]
+  const cyz: Corner = [0, y, z]
+  const cxyz: Corner = [x, y, z]
+
+  return [
+    // bottom face (z = 0)
+    [o, cx],
+    [o, cy],
+    [cx, cxy],
+    [cy, cxy],
+    // top face (z = max z)
+    [cz, cxz],
+    [cz, cyz],
+    [cxz, cxyz],
+    [cyz, cxyz],
+    // the 4 verticals connecting the two faces
+    [o, cz],
+    [cx, cxz],
+    [cy, cyz],
+    [cxy, cxyz],
+  ]
+}
+
+/** Duration of the growth animation, in seconds — tuned by eye (see PROGRESS.md). */
+export const GROWTH_DURATION = 0.6
+
+/**
+ * Caps how much of `GROWTH_DURATION` a single animation frame can ever advance
+ * (`scene/StageGrowthTransition.tsx` clamps `useFrame`'s real `delta` to this before
+ * accumulating it) — standard "delta clamping" for real-time animation, guarding
+ * against the frame-rate equivalent of a spiral of death: without it, one unusually
+ * large frame (a backgrounded-then-refocused tab, or several headless browsers
+ * contending for CPU during a full Playwright run — confirmed as a real, reproducible
+ * source of full-suite flakiness in this sandbox, not just a hypothetical) could
+ * silently swallow the *entire* growth duration in a single tick, making the animation
+ * appear to teleport straight to its end state instead of actually playing. At
+ * `GROWTH_DURATION = 0.6`, this guarantees at least `0.6 / 0.05 = 12` real frames
+ * always render before the animation can finish, no matter how stalled any individual
+ * frame's real wall-clock delta was.
+ */
+export const GROWTH_MAX_FRAME_DELTA = 0.05
+
+/**
+ * Per-stage `max` corner (world space; `min` is always the origin — see the module doc
+ * comment) for the two stages that ever appear as either end of a growth transition.
+ * 'reveal'/'closing' never appear here — the cube->reveal boundary deliberately gets no
+ * growth animation at all (see `state/store.ts`'s `advanceStage`, and PLAN.md's "why a
+ * growth animation... and why not across the Stage 3->4 boundary" rationale).
+ */
+export const GROWTH_MAX_CORNER: Record<'line' | 'plane' | 'cube', Corner> = {
+  line: [3, 0, 0],
+  plane: [3, 3, 0],
+  cube: [2.5, 2.5, 2.5],
+}

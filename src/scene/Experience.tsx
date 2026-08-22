@@ -9,6 +9,7 @@ import { CursorTracker } from './CursorTracker'
 import { Grid } from './Grid'
 import { RevealDrag } from './RevealDrag'
 import { SliceWarmup } from './SliceWarmup'
+import { StageGrowthTransition } from './StageGrowthTransition'
 import { TrackedCubeVertexTracker } from './TrackedCubeVertexTracker'
 import { CAMERA_FRAMING, SPRING_BACK_SHARPNESS, easedTowardRange } from './cameraFraming'
 import { cameraControlsRef } from './cameraControlsRef'
@@ -22,6 +23,16 @@ function StageGeometry() {
   const stage = useDimensionsStore((state) => state.stage)
   const revealWarmupActive = useDimensionsStore((state) => state.revealWarmupActive)
   const revealView = useDimensionsStore((state) => state.revealView)
+  const growthTransition = useDimensionsStore((state) => state.growthTransition)
+
+  // Task 25: while a growth-transition animation is playing into this stage,
+  // `StageGrowthTransition` (mounted below in `Experience`) renders the animating
+  // wireframe in its place — showing both at once would let the fully-formed
+  // destination shape appear instantly on the very first frame, defeating the whole
+  // point of watching it grow. `growthTransition.to` and `stage` are always set
+  // together by the same `advanceStage()` call (see `state/store.ts`), so this only
+  // ever suppresses the stage the animation is actually headed toward.
+  if (growthTransition && growthTransition.to === stage) return null
 
   switch (stage) {
     case 'line':
@@ -178,6 +189,7 @@ export function Experience() {
       <SceneLights />
       <Grid />
       <StageGeometry />
+      <StageGrowthTransition />
       <CameraRig />
       <ArrowDrag />
       <RevealDrag />

@@ -54,6 +54,12 @@ export function ArrowDrag() {
   const stage = useDimensionsStore((state) => state.stage)
   const startDrawing = useDimensionsStore((state) => state.startDrawing)
   const endDrawing = useDimensionsStore((state) => state.endDrawing)
+  // Task 25: while the just-arrived-at stage's shape is still mid-growth-animation
+  // (`scene/StageGrowthTransition.tsx`), its collider stays inert — dragging on a shape
+  // that visually isn't fully there yet would be a confusing way to start an attempt.
+  // `growthTransition.to` always equals `stage` whenever it's non-null (see
+  // `state/store.ts`'s `advanceStage`), so a plain non-null check is enough here.
+  const growthTransition = useDimensionsStore((state) => state.growthTransition)
 
   const camera = useThree((state) => state.camera)
   const gl = useThree((state) => state.gl)
@@ -173,7 +179,7 @@ export function ArrowDrag() {
 
   return (
     <>
-      {stage === 'line' && (
+      {stage === 'line' && !growthTransition && (
         <mesh
           geometry={lineColliderGeometry}
           position={SHAPE_POSITION.line}
@@ -183,7 +189,7 @@ export function ArrowDrag() {
           <meshBasicMaterial transparent opacity={0} depthWrite={false} />
         </mesh>
       )}
-      {stage === 'plane' && (
+      {stage === 'plane' && !growthTransition && (
         <mesh
           geometry={planeColliderGeometry}
           position={SHAPE_POSITION.plane}
@@ -192,7 +198,7 @@ export function ArrowDrag() {
           <meshBasicMaterial transparent opacity={0} depthWrite={false} side={DoubleSide} />
         </mesh>
       )}
-      {stage === 'cube' && (
+      {stage === 'cube' && !growthTransition && (
         <mesh
           geometry={cubeColliderGeometry}
           position={SHAPE_POSITION.cube}

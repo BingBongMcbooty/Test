@@ -91,6 +91,27 @@ interface DimensionsState {
    * bit) is the only way back to `false` short of a stage change.
    */
   revealWarmupActive: boolean
+  /**
+   * Task 25: non-null exactly while the Stage 1->2 or 2->3 growth animation
+   * (`scene/StageGrowthTransition.tsx`) is playing — `{ from, to }` names the two
+   * stages the animation is extruding between (`to` always equals the just-set `stage`
+   * below; kept as its own field rather than derived so `math/growth.ts`'s
+   * `GROWTH_MAX_CORNER[from]`/`[to]` lookups read directly off this one value).
+   * `advanceStage()` is the only setter that ever populates this, and only for the two
+   * edges that structurally extend the previous shape by one axis — every other
+   * transition (including cube->reveal, deliberately: see PLAN.md's "why a growth
+   * animation... and why not across the Stage 3->4 boundary") leaves it `null`, which
+   * is what `scene/Experience.tsx`'s `StageGeometry` reads to decide whether to render
+   * the destination stage's normal static shape immediately (as it always has) or let
+   * `StageGrowthTransition` animate into it first. `setStage()` (the debug jump used
+   * throughout the existing Playwright suite and `ui/DebugStageControls.tsx`) always
+   * clears it to `null` rather than ever setting it — jumping stages for
+   * testing/navigation convenience was never meant to play the narrative growth beat,
+   * mirroring `revealWarmupActive`'s own "only real progression triggers this" rule.
+   * Cleared by `finishGrowthTransition()`, called by `StageGrowthTransition` itself once
+   * its animation timer completes.
+   */
+  growthTransition: { from: Stage; to: Stage } | null
 
   setStage: (stage: Stage) => void
   advanceStage: () => void
@@ -106,6 +127,7 @@ interface DimensionsState {
   rotateRevealYW: (deltaAngle: number) => void
   adjustRevealSlice: (delta: number) => void
   finishRevealWarmup: () => void
+  finishGrowthTransition: () => void
   reset: () => void
 }
 
@@ -123,6 +145,7 @@ const initialState = {
   revealRotationYW: 0,
   revealSliceW0: 0,
   revealWarmupActive: false,
+  growthTransition: null as { from: Stage; to: Stage } | null,
 }
 
 function clamp(value: number, min: number, max: number): number {
@@ -143,11 +166,19 @@ export const useDimensionsStore = create<DimensionsState>((set) => ({
       trackedCubeVertexCamera: null,
       stagePassed: false,
       revealWarmupActive: false,
+      growthTransition: null,
     }),
 
   advanceStage: () =>
     set((state) => {
       const stage = nextStage(state.stage)
+      // Task 25: only these two edges structurally extend the previous shape by one
+      // axis — cube->reveal (and line/plane/cube's own no-op self-advance at the very
+      // end of STAGE_ORDER) deliberately never populates this. See this field's own
+      // doc comment above for why.
+      const isGrowthEdge =
+        (state.stage === 'line' && stage === 'plane') ||
+        (state.stage === 'plane' && stage === 'cube')
       return {
         stage,
         attempts: 0,
@@ -158,6 +189,7 @@ export const useDimensionsStore = create<DimensionsState>((set) => ({
         trackedCubeVertexCamera: null,
         stagePassed: false,
         revealWarmupActive: stage === 'reveal',
+        growthTransition: isGrowthEdge ? { from: state.stage, to: stage } : null,
       }
     }),
 
@@ -196,6 +228,8 @@ export const useDimensionsStore = create<DimensionsState>((set) => ({
     })),
 
   finishRevealWarmup: () => set({ revealWarmupActive: false }),
+
+  finishGrowthTransition: () => set({ growthTransition: null }),
 
   reset: () => set({ ...initialState }),
 }))

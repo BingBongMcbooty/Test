@@ -40,8 +40,16 @@ export const STAGE_CONFIG: Record<Stage, StageConfig> = {
   },
   reveal: {
     occupiedAxes: ['x', 'y', 'z'],
+    // Task 25: the Stage 3->Reveal boundary deliberately gets no growth animation (see
+    // PLAN.md's "why a growth animation... and why not across the Stage 3->4 boundary"
+    // rationale) — this copy says so directly instead of leaving the missing animation
+    // to read as one that just didn't happen, and names "projection"/"shadow" by word
+    // before the player ever meets `ui/RevealControls.tsx`'s "Show projection" toggle,
+    // so the metaphor arrives as an answer, not an inference from a button label.
     prompt:
-      'Every direction you tried was already here. There is a 4th — you just can’t point at it.',
+      'Every direction you tried was already here. There is a 4th — you just can’t point at it, ' +
+      'so there’s no growing into it the way the line grew into the plane, and the plane into ' +
+      'the cube. What you can see is its shadow: a projection, the same way a 3D object casts a 2D one.',
   },
   closing: {
     occupiedAxes: ['x', 'y', 'z'],

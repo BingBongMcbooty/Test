@@ -310,6 +310,61 @@ describe('revealWarmupActive / finishRevealWarmup', () => {
   })
 })
 
+describe('growthTransition / finishGrowthTransition', () => {
+  it('starts null', () => {
+    expect(getState().growthTransition).toBeNull()
+  })
+
+  it('advanceStage sets it for line->plane and plane->cube, the only two growth edges', () => {
+    getState().advanceStage() // line -> plane
+    expect(getState().growthTransition).toEqual({ from: 'line', to: 'plane' })
+    getState().advanceStage() // plane -> cube
+    expect(getState().growthTransition).toEqual({ from: 'plane', to: 'cube' })
+  })
+
+  it('advanceStage does NOT set it for cube->reveal — the deliberate exception (no growing into the 4th)', () => {
+    getState().setStage('cube')
+    getState().advanceStage() // cube -> reveal
+    expect(getState().stage).toBe('reveal')
+    expect(getState().growthTransition).toBeNull()
+  })
+
+  it('advanceStage does not set it for reveal->closing, or the clamped no-op past closing', () => {
+    getState().setStage('reveal')
+    getState().advanceStage() // reveal -> closing
+    expect(getState().growthTransition).toBeNull()
+    getState().advanceStage() // clamped, still closing
+    expect(getState().growthTransition).toBeNull()
+  })
+
+  it('setStage never activates it, even jumping straight from line to plane', () => {
+    getState().setStage('plane')
+    expect(getState().stage).toBe('plane')
+    expect(getState().growthTransition).toBeNull()
+  })
+
+  it('setStage clears it if a real advance had just set it', () => {
+    getState().advanceStage() // line -> plane, sets growthTransition
+    expect(getState().growthTransition).not.toBeNull()
+    getState().setStage('plane')
+    expect(getState().growthTransition).toBeNull()
+  })
+
+  it('finishGrowthTransition clears it without touching the stage', () => {
+    getState().advanceStage() // line -> plane
+    expect(getState().growthTransition).toEqual({ from: 'line', to: 'plane' })
+    getState().finishGrowthTransition()
+    expect(getState().growthTransition).toBeNull()
+    expect(getState().stage).toBe('plane')
+  })
+
+  it('is cleared by reset', () => {
+    getState().advanceStage()
+    getState().reset()
+    expect(getState().growthTransition).toBeNull()
+  })
+})
+
 describe('reset', () => {
   it('restores initial state from anywhere', () => {
     getState().setStage('reveal')
