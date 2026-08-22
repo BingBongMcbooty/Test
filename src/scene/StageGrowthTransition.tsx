@@ -5,13 +5,13 @@ import {
   GROWTH_DURATION,
   GROWTH_EDGE_COUNT,
   GROWTH_FLASH_COLOR,
-  GROWTH_MAX_CORNER,
   GROWTH_MAX_FRAME_DELTA,
   GROWTH_REST_COLOR,
   boxWireframeEdges,
   easeGrowthFlashy,
   growthFlashIntensity,
   lerpCorner,
+  signedGrowthMaxCorner,
 } from '../math/growth'
 import { useDimensionsStore } from '../state/store'
 
@@ -69,6 +69,7 @@ const flashColor = new Color(GROWTH_FLASH_COLOR)
 export function StageGrowthTransition() {
   const growthTransition = useDimensionsStore((state) => state.growthTransition)
   const finishGrowthTransition = useDimensionsStore((state) => state.finishGrowthTransition)
+  const axisSign = useDimensionsStore((state) => state.axisSign)
   const elapsedRef = useRef(0)
   const materialRef = useRef<LineBasicMaterial>(null)
 
@@ -87,9 +88,15 @@ export function StageGrowthTransition() {
     // overshoot-eased value, which can briefly exceed 1.
     const rawT = Math.min(1, elapsedRef.current / GROWTH_DURATION)
     const poppedT = easeGrowthFlashy(rawT)
+    // Post-Task-25: both ends signed by the *same* current axisSign — the 'from'
+    // corner needs it too (not just 'to'), since e.g. the plane->cube transition's
+    // 'from' corner is the plane's own already-mirrored y, and interpolating from an
+    // unsigned start would jump right at the animation's first frame instead of
+    // continuing smoothly from wherever the real, just-suppressed PlaneStage actually
+    // was (see ArrowDrag.tsx's `discoveredAxisSign`/store's `recordAxisDiscovery`).
     const maxCorner = lerpCorner(
-      GROWTH_MAX_CORNER[growthTransition.from as 'line' | 'plane'],
-      GROWTH_MAX_CORNER[growthTransition.to as 'plane' | 'cube'],
+      signedGrowthMaxCorner(growthTransition.from as 'line' | 'plane', axisSign),
+      signedGrowthMaxCorner(growthTransition.to as 'plane' | 'cube', axisSign),
       poppedT,
     )
     const edges = boxWireframeEdges(maxCorner)

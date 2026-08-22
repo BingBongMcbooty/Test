@@ -1,5 +1,6 @@
 import { useMemo } from 'react'
 import { BufferAttribute, BufferGeometry, Line, LineDashedMaterial, Vector3 } from 'three'
+import type { AxisSign } from '../state/stageConfig'
 import { useDimensionsStore } from '../state/store'
 
 /**
@@ -77,15 +78,29 @@ function planePoint(plane: Plane, a: number, b: number): [number, number, number
   }
 }
 
-/** A grid of lines covering `[0, extent]` in both directions of `plane`, at spacing `spacing`. */
-function buildQuadrantGridGeometry(extent: number, spacing: number, plane: Plane): BufferGeometry {
+/**
+ * A grid of lines covering `[0, magnitude*signA]`/`[0, magnitude*signB]` in `plane`'s
+ * two directions, at spacing `spacing`. Post-Task-25: `signA`/`signB` (each ±1) mirror
+ * the grid to match wherever the shape it's the backdrop for actually mirrored to (see
+ * `state/stageConfig.ts`'s `AxisSign` doc comment) — at `signA = signB = 1` this
+ * reproduces the original always-positive-quadrant grid exactly.
+ */
+function buildQuadrantGridGeometry(
+  magnitude: number,
+  spacing: number,
+  plane: Plane,
+  signA: 1 | -1,
+  signB: 1 | -1,
+): BufferGeometry {
   const positions: number[] = []
-  const steps = Math.round(extent / spacing)
+  const steps = Math.round(magnitude / spacing)
+  const extentA = magnitude * signA
+  const extentB = magnitude * signB
 
   for (let i = 0; i <= steps; i++) {
     const t = i * spacing
-    positions.push(...planePoint(plane, t, 0), ...planePoint(plane, t, extent))
-    positions.push(...planePoint(plane, 0, t), ...planePoint(plane, extent, t))
+    positions.push(...planePoint(plane, t * signA, 0), ...planePoint(plane, t * signA, extentB))
+    positions.push(...planePoint(plane, 0, t * signB), ...planePoint(plane, extentA, t * signB))
   }
 
   const geometry = new BufferGeometry()
@@ -93,13 +108,27 @@ function buildQuadrantGridGeometry(extent: number, spacing: number, plane: Plane
   return geometry
 }
 
-function useQuadrantGrid(extent: number, spacing: number, plane: Plane): BufferGeometry {
-  return useMemo(() => buildQuadrantGridGeometry(extent, spacing, plane), [extent, spacing, plane])
+function useQuadrantGrid(
+  magnitude: number,
+  spacing: number,
+  plane: Plane,
+  signA: 1 | -1,
+  signB: 1 | -1,
+): BufferGeometry {
+  return useMemo(
+    () => buildQuadrantGridGeometry(magnitude, spacing, plane, signA, signB),
+    [magnitude, spacing, plane, signA, signB],
+  )
 }
 
-/** Stage 2: x/y graph paper the plane sits on top of. */
-function PlaneGrid() {
-  const geometry = useQuadrantGrid(PLANE_GRID_EXTENT, PLANE_GRID_SPACING, 'xy')
+/**
+ * Stage 2: x/y graph paper the plane sits on top of. `x` never mirrors (see
+ * `state/stageConfig.ts`'s `AxisSign` doc comment) — only `y`, via `axisSign.y`. The
+ * z-pullback epsilon stays fixed (the plane's own z is never mirrored, so "away from
+ * the camera" is always -z here regardless of `axisSign`).
+ */
+function PlaneGrid({ axisSign }: { axisSign: AxisSign }) {
+  const geometry = useQuadrantGrid(PLANE_GRID_EXTENT, PLANE_GRID_SPACING, 'xy', 1, axisSign.y)
   return (
     <lineSegments geometry={geometry} position={[0, 0, -COPLANAR_EPSILON]}>
       <lineBasicMaterial color={GRID_COLOR} transparent opacity={GRID_OPACITY} />
@@ -107,18 +136,25 @@ function PlaneGrid() {
   )
 }
 
-/** Stage 3: floor (xy) + two walls (xz, yz) meeting at the origin, like a room corner. */
-function CubeGrid() {
-  const floor = useQuadrantGrid(CUBE_GRID_EXTENT, CUBE_GRID_SPACING, 'xy')
-  const wallXZ = useQuadrantGrid(CUBE_GRID_EXTENT, CUBE_GRID_SPACING, 'xz')
-  const wallYZ = useQuadrantGrid(CUBE_GRID_EXTENT, CUBE_GRID_SPACING, 'yz')
+/**
+ * Stage 3: floor (xy) + two walls (xz, yz) meeting at the cube's own corner — post-
+ * Task-25, that corner is wherever `axisSign` mirrored the cube to, not always the
+ * world origin. Each wall's pullback epsilon flips sign along with whichever axis it's
+ * offset on, since a mirrored cube also gets a mirrored camera (`cameraFraming.ts`'s
+ * `cameraPositionTarget`) — "away from the camera" flips right along with it. The `x`
+ * pullback (`wallYZ`) never flips: `x` itself never mirrors.
+ */
+function CubeGrid({ axisSign }: { axisSign: AxisSign }) {
+  const floor = useQuadrantGrid(CUBE_GRID_EXTENT, CUBE_GRID_SPACING, 'xy', 1, axisSign.y)
+  const wallXZ = useQuadrantGrid(CUBE_GRID_EXTENT, CUBE_GRID_SPACING, 'xz', 1, axisSign.z)
+  const wallYZ = useQuadrantGrid(CUBE_GRID_EXTENT, CUBE_GRID_SPACING, 'yz', axisSign.y, axisSign.z)
 
   return (
     <group>
-      <lineSegments geometry={floor} position={[0, 0, -COPLANAR_EPSILON]}>
+      <lineSegments geometry={floor} position={[0, 0, -COPLANAR_EPSILON * axisSign.z]}>
         <lineBasicMaterial color={GRID_COLOR} transparent opacity={GRID_OPACITY} />
       </lineSegments>
-      <lineSegments geometry={wallXZ} position={[0, -COPLANAR_EPSILON, 0]}>
+      <lineSegments geometry={wallXZ} position={[0, -COPLANAR_EPSILON * axisSign.y, 0]}>
         <lineBasicMaterial color={GRID_COLOR} transparent opacity={GRID_OPACITY} />
       </lineSegments>
       <lineSegments geometry={wallYZ} position={[-COPLANAR_EPSILON, 0, 0]}>
@@ -131,14 +167,15 @@ function CubeGrid() {
 /** Per-stage coordinate-space background grid — see the module doc comment above. */
 export function Grid() {
   const stage = useDimensionsStore((state) => state.stage)
+  const axisSign = useDimensionsStore((state) => state.axisSign)
 
   switch (stage) {
     case 'line':
       return <LineGrid />
     case 'plane':
-      return <PlaneGrid />
+      return <PlaneGrid axisSign={axisSign} />
     case 'cube':
-      return <CubeGrid />
+      return <CubeGrid axisSign={axisSign} />
     default:
       return null
   }

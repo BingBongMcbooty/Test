@@ -1,7 +1,9 @@
 import { create } from 'zustand'
 import type { AttemptResult, Vec3 } from '../math/validation'
 import {
+  DEFAULT_AXIS_SIGN,
   REVEAL_SLICE_RANGE,
+  type AxisSign,
   type RevealView,
   type Stage,
   nextRevealView,
@@ -112,6 +114,26 @@ interface DimensionsState {
    * its animation timer completes.
    */
   growthTransition: { from: Stage; to: Stage } | null
+  /**
+   * Post-Task-25 playtest feedback: which sign the player actually demonstrated for
+   * each of the two axes a real growth transition can extend along — `y` (discovered
+   * on a Stage 1 pass) and `z` (discovered on a Stage 2 pass). Read by `ArrowDrag.tsx`'s
+   * colliders, `scene/stages/{Plane,Cube}Stage.tsx`, `scene/Grid.tsx`,
+   * `scene/cameraFraming.ts`'s `cameraPositionTarget`, and `scene/StageGrowthTransition.tsx`
+   * — everywhere the fixed "always grows +y then +z" constants used to be read directly.
+   * `recordAxisDiscovery` is the only setter; it's called from `ArrowDrag.tsx` on every
+   * *passing* drag (not just the first — Task 18 lets a player keep passing/failing
+   * after their first pass, and whichever direction they most recently demonstrated is
+   * the one that should grow), so it can change more than once before `advanceStage()`
+   * actually plays the animation. `setStage()` (debug jumps) and `reset()` both restore
+   * `DEFAULT_AXIS_SIGN` — jumping stages for testing/navigation convenience was never a
+   * real discovery, mirroring `growthTransition`'s/`revealWarmupActive`'s own "only real
+   * progression triggers this" rule. `advanceStage()` deliberately leaves it untouched:
+   * the sign just recorded is exactly what the transition it's about to play needs to
+   * honor, and a later stage's own discovery (e.g. Stage 2's z) must never clobber an
+   * earlier one still in effect (Stage 1's y).
+   */
+  axisSign: AxisSign
 
   setStage: (stage: Stage) => void
   advanceStage: () => void
@@ -128,6 +150,7 @@ interface DimensionsState {
   adjustRevealSlice: (delta: number) => void
   finishRevealWarmup: () => void
   finishGrowthTransition: () => void
+  recordAxisDiscovery: (axis: 'y' | 'z', sign: 1 | -1) => void
   reset: () => void
 }
 
@@ -146,6 +169,7 @@ const initialState = {
   revealSliceW0: 0,
   revealWarmupActive: false,
   growthTransition: null as { from: Stage; to: Stage } | null,
+  axisSign: DEFAULT_AXIS_SIGN,
 }
 
 function clamp(value: number, min: number, max: number): number {
@@ -167,6 +191,7 @@ export const useDimensionsStore = create<DimensionsState>((set) => ({
       stagePassed: false,
       revealWarmupActive: false,
       growthTransition: null,
+      axisSign: DEFAULT_AXIS_SIGN,
     }),
 
   advanceStage: () =>
@@ -230,6 +255,9 @@ export const useDimensionsStore = create<DimensionsState>((set) => ({
   finishRevealWarmup: () => set({ revealWarmupActive: false }),
 
   finishGrowthTransition: () => set({ growthTransition: null }),
+
+  recordAxisDiscovery: (axis, sign) =>
+    set((state) => ({ axisSign: { ...state.axisSign, [axis]: sign } })),
 
   reset: () => set({ ...initialState }),
 }))

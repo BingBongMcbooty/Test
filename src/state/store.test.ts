@@ -365,6 +365,51 @@ describe('growthTransition / finishGrowthTransition', () => {
   })
 })
 
+describe('axisSign / recordAxisDiscovery (post-Task-25: honoring the drawn direction)', () => {
+  it('starts at the default (both +1), matching the pre-existing positive-octant behavior', () => {
+    expect(getState().axisSign).toEqual({ y: 1, z: 1 })
+  })
+
+  it('recordAxisDiscovery sets only the named axis, leaving the other untouched', () => {
+    getState().recordAxisDiscovery('y', -1)
+    expect(getState().axisSign).toEqual({ y: -1, z: 1 })
+    getState().recordAxisDiscovery('z', -1)
+    expect(getState().axisSign).toEqual({ y: -1, z: -1 })
+  })
+
+  it('a later discovery on the same axis overwrites the earlier one', () => {
+    getState().recordAxisDiscovery('y', -1)
+    getState().recordAxisDiscovery('y', 1)
+    expect(getState().axisSign.y).toBe(1)
+  })
+
+  it('is NOT reset by advanceStage — a discovery made before Continue must survive into the transition it drives', () => {
+    getState().recordAxisDiscovery('y', -1)
+    getState().advanceStage() // line -> plane
+    expect(getState().axisSign).toEqual({ y: -1, z: 1 })
+  })
+
+  it('an earlier discovery survives a later, different axis being discovered', () => {
+    getState().recordAxisDiscovery('y', -1)
+    getState().advanceStage() // line -> plane
+    getState().recordAxisDiscovery('z', -1)
+    expect(getState().axisSign).toEqual({ y: -1, z: -1 })
+  })
+
+  it('is reset to the default by setStage — a debug jump is never a real discovery', () => {
+    getState().recordAxisDiscovery('y', -1)
+    getState().setStage('plane')
+    expect(getState().axisSign).toEqual({ y: 1, z: 1 })
+  })
+
+  it('is reset to the default by reset', () => {
+    getState().recordAxisDiscovery('y', -1)
+    getState().recordAxisDiscovery('z', -1)
+    getState().reset()
+    expect(getState().axisSign).toEqual({ y: 1, z: 1 })
+  })
+})
+
 describe('reset', () => {
   it('restores initial state from anywhere', () => {
     getState().setStage('reveal')

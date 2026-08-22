@@ -3,6 +3,26 @@ export type Stage = 'line' | 'plane' | 'cube' | 'reveal' | 'closing'
 export type Axis = 'x' | 'y' | 'z'
 
 /**
+ * Post-Task-25 playtest feedback: growing Stage 2/3 in a fixed +y/+z direction
+ * regardless of which way the player actually dragged "invalidates the meaning of the
+ * arrow's direction" (their words) — a drag that passes by leaving the line/plane
+ * toward -y/-z is just as real a discovery as +y/+z (`evaluateAttempt` never looks at
+ * sign, only the orthogonal-leftover ratio), so the shape, its grid, and its camera
+ * framing all now mirror to match whichever sign the player actually demonstrated. `x`
+ * is never mirrored — every stage keeps x occupied from Stage 1 on, so there's never a
+ * discovery to honor on that axis. See `scene/shapePositions.ts`, `scene/Grid.tsx`,
+ * `scene/cameraFraming.ts`'s `cameraPositionTarget`, and `math/growth.ts`'s
+ * `signedGrowthMaxCorner`/`discoveredAxisSign` for where this actually gets used.
+ */
+export interface AxisSign {
+  y: 1 | -1
+  z: 1 | -1
+}
+
+/** The pre-this-feature behavior — both new axes grow positive, matching every debug-jumped stage. */
+export const DEFAULT_AXIS_SIGN: AxisSign = { y: 1, z: 1 }
+
+/**
  * Stage 4's three lenses onto the same underlying 4D state (see RevealStage.tsx /
  * ChiralityDemo.tsx) — all driven by the same `revealRotationXW`/`revealRotationYW`/
  * `revealSliceW0` store fields.

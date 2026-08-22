@@ -4,10 +4,12 @@ import {
   GROWTH_EDGE_COUNT,
   GROWTH_MAX_CORNER,
   boxWireframeEdges,
+  discoveredAxisSign,
   easeGrowth,
   easeGrowthFlashy,
   growthFlashIntensity,
   lerpCorner,
+  signedGrowthMaxCorner,
 } from './growth'
 
 function edgeLength([a, b]: readonly [readonly number[], readonly number[]]): number {
@@ -162,5 +164,63 @@ describe('boxWireframeEdges', () => {
   it('at a zero corner (t=0 of a line->plane transition), every edge is degenerate', () => {
     const edges = boxWireframeEdges([0, 0, 0])
     expect(edges.every((edge) => edgeLength(edge) === 0)).toBe(true)
+  })
+})
+
+describe('signedGrowthMaxCorner (post-Task-25: honoring the drawn direction)', () => {
+  it('at the default axisSign, reproduces GROWTH_MAX_CORNER exactly', () => {
+    expect(signedGrowthMaxCorner('line', { y: 1, z: 1 })).toEqual(GROWTH_MAX_CORNER.line)
+    expect(signedGrowthMaxCorner('plane', { y: 1, z: 1 })).toEqual(GROWTH_MAX_CORNER.plane)
+    expect(signedGrowthMaxCorner('cube', { y: 1, z: 1 })).toEqual(GROWTH_MAX_CORNER.cube)
+  })
+
+  it('negates only y when axisSign.y is -1, leaving x/z untouched', () => {
+    expect(signedGrowthMaxCorner('plane', { y: -1, z: 1 })).toEqual([3, -3, 0])
+  })
+
+  it('negates only z when axisSign.z is -1, leaving x/y untouched', () => {
+    expect(signedGrowthMaxCorner('cube', { y: 1, z: -1 })).toEqual([2.5, 2.5, -2.5])
+  })
+
+  it('negates both y and z together for the cube when both signs are -1', () => {
+    expect(signedGrowthMaxCorner('cube', { y: -1, z: -1 })).toEqual([2.5, -2.5, -2.5])
+  })
+
+  it("the line's own corner is unaffected by either sign (y and z are already 0)", () => {
+    expect(signedGrowthMaxCorner('line', { y: -1, z: -1 })).toEqual(GROWTH_MAX_CORNER.line)
+  })
+})
+
+describe('discoveredAxisSign (post-Task-25: which axis/sign a passing drag actually demonstrated)', () => {
+  it("picks y for a Stage 1 pass (occupiedAxes=['x']), regardless of its sign", () => {
+    expect(discoveredAxisSign({ x: 0.1, y: 2, z: 0 }, ['x'])).toEqual({ axis: 'y', sign: 1 })
+    expect(discoveredAxisSign({ x: 0.1, y: -2, z: 0 }, ['x'])).toEqual({ axis: 'y', sign: -1 })
+  })
+
+  it("picks z for a Stage 2 pass (occupiedAxes=['x','y']), regardless of its sign", () => {
+    expect(discoveredAxisSign({ x: 0.1, y: 0.1, z: 1.5 }, ['x', 'y'])).toEqual({ axis: 'z', sign: 1 })
+    expect(discoveredAxisSign({ x: 0.1, y: 0.1, z: -1.5 }, ['x', 'y'])).toEqual({
+      axis: 'z',
+      sign: -1,
+    })
+  })
+
+  it('picks the larger-magnitude candidate when both y and z are unoccupied', () => {
+    expect(discoveredAxisSign({ x: 0, y: 0.4, z: 2 }, ['x'])).toEqual({ axis: 'z', sign: 1 })
+    expect(discoveredAxisSign({ x: 0, y: 2, z: 0.4 }, ['x'])).toEqual({ axis: 'y', sign: 1 })
+  })
+
+  it('never returns x, even if x has the largest magnitude — x is always occupied for every real pass', () => {
+    const result = discoveredAxisSign({ x: 5, y: 0.5, z: 0 }, ['x'])
+    expect(result?.axis).not.toBe('x')
+    expect(result).toEqual({ axis: 'y', sign: 1 })
+  })
+
+  it('returns null when every unoccupied axis is exactly zero', () => {
+    expect(discoveredAxisSign({ x: 3, y: 0, z: 0 }, ['x'])).toBeNull()
+  })
+
+  it('treats an exact-zero dominant component as positive sign (>= 0), not a crash or NaN', () => {
+    expect(discoveredAxisSign({ x: 0, y: 0, z: 1 }, ['x', 'y'])).toEqual({ axis: 'z', sign: 1 })
   })
 })

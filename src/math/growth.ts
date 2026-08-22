@@ -181,3 +181,62 @@ export const GROWTH_MAX_CORNER: Record<'line' | 'plane' | 'cube', Corner> = {
   plane: [3, 3, 0],
   cube: [2.5, 2.5, 2.5],
 }
+
+/**
+ * Post-Task-25 playtest feedback: `GROWTH_MAX_CORNER` above always grows +y then +z,
+ * which "invalidates the meaning of the arrow's direction" when a player legitimately
+ * passes by dragging -y or -z instead (`evaluateAttempt` never looks at sign — only the
+ * orthogonal-leftover ratio does). This applies `axisSign` (recorded by `ArrowDrag.tsx`
+ * from the real passing drag, via `discoveredAxisSign` below) to `GROWTH_MAX_CORNER`'s
+ * canonical positive values, so the growth geometry sweeps toward whichever sign the
+ * player actually demonstrated. `boxWireframeEdges` (above) already handles a negative
+ * `max` component correctly with no changes of its own — it only ever draws a box from
+ * the origin to `max`, and a negative component is just a box extending the other way.
+ */
+export function signedGrowthMaxCorner(
+  stage: 'line' | 'plane' | 'cube',
+  axisSign: { y: 1 | -1; z: 1 | -1 },
+): Corner {
+  const [x, y, z] = GROWTH_MAX_CORNER[stage]
+  // `+ 0` normalizes a `0 * -1` result back to positive `0` (IEEE-754 addition, unlike
+  // multiplication, does this for free) — a zero component (line's y/z, plane's z)
+  // otherwise silently becomes `-0`, which is numerically harmless everywhere this
+  // feeds into (rendering, `lerpCorner`) but trips exact `toEqual` comparisons in tests.
+  return [x, (y * axisSign.y) + 0, (z * axisSign.z) + 0]
+}
+
+/**
+ * Which unoccupied axis a passing drag's leftover was actually dominant in, and its
+ * sign — `ArrowDrag.tsx` calls this on every passing Stage 1/2 drag and feeds the
+ * result to `state/store.ts`'s `recordAxisDiscovery`. Only `y`/`z` can ever come back:
+ * `x` is occupied at every stage that can pass (line/plane both keep it occupied), so
+ * it's never a candidate. Picks the *largest-magnitude* unoccupied component rather
+ * than assuming a fixed axis, so this stays correct even though in practice Stage 1's
+ * dead-on camera (see `cameraFraming.ts`) makes z's leftover component negligible and
+ * Stage 2's occupied axes leave only z as a candidate at all — the dominant-component
+ * selection is what "approximated to a right angle" means here: whichever single axis
+ * the drag was mostly pointing along wins, not some blend of more than one. Returns
+ * `null` for a totally zero leftover (shouldn't happen for a drag that already passed
+ * `ORTHOGONALITY_THRESHOLD`, but a defensive fallback rather than a crash). Takes the
+ * raw drag vector rather than an already-projected leftover — `projectOntoComplement`
+ * only zeroes the *occupied* components, so for the unoccupied `y`/`z` candidates this
+ * function actually reads, the raw vector and the leftover agree exactly; the caller
+ * doesn't need to project first.
+ */
+export function discoveredAxisSign(
+  dragVector: { x: number; y: number; z: number },
+  occupiedAxes: readonly ('x' | 'y' | 'z')[],
+): { axis: 'y' | 'z'; sign: 1 | -1 } | null {
+  const candidates = (['y', 'z'] as const).filter((axis) => !occupiedAxes.includes(axis))
+  let bestAxis: 'y' | 'z' | null = null
+  let bestMagnitude = 0
+  for (const axis of candidates) {
+    const magnitude = Math.abs(dragVector[axis])
+    if (magnitude > bestMagnitude) {
+      bestMagnitude = magnitude
+      bestAxis = axis
+    }
+  }
+  if (!bestAxis) return null
+  return { axis: bestAxis, sign: dragVector[bestAxis] >= 0 ? 1 : -1 }
+}

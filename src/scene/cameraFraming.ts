@@ -1,4 +1,5 @@
-import type { Stage } from '../state/stageConfig'
+import type { AxisSign, Stage } from '../state/stageConfig'
+import { LINE_POSITION, cubePosition, planePosition } from './shapePositions'
 
 export interface CameraFraming {
   position: readonly [number, number, number]
@@ -229,4 +230,49 @@ export const CAMERA_FRAMING: Record<Stage, CameraFraming> = {
     azimuthRange: FULL_AZIMUTH_RANGE,
     polarRange: FULL_POLAR_RANGE,
   },
+}
+
+/**
+ * Post-Task-25 playtest feedback: `CAMERA_FRAMING`'s `position`/`target` above are
+ * fixed values matching the pre-existing positive-octant shapes — kept exactly as-is
+ * (still used directly for `azimuthRange`/`polarRange`, which never depend on
+ * `axisSign` — see `state/stageConfig.ts`'s `AxisSign` doc comment for why: a camera's
+ * *orientation* relative to its target is unaffected by which world-space octant that
+ * target actually sits in). This function is the live, mirrored counterpart used for
+ * the actual `position`/`target` a camera gets pointed at — `scene/Experience.tsx`'s
+ * `CameraRig` and its initial `Canvas` camera prop are the only two callers.
+ *
+ * Each stage's camera *offset* from its target (not just the target itself) mirrors by
+ * the same sign as that stage's shape — for the cube this keeps the camera on the same
+ * "outside" side of the mirrored shape it always was (an unmirrored offset would leave
+ * the camera framing the shape from across the origin, looking the wrong way in). The
+ * dead-on stages' (line/plane) offset is pure `+z` with no `y` component to begin with,
+ * so mirroring `y` there is a no-op — confirmed by `e2e/orbit.spec.ts`'s existing
+ * dead-on rest-state assertion, which this function reproduces exactly at the default
+ * `axisSign = { y: 1, z: 1 }`.
+ */
+export function cameraPositionTarget(
+  stage: Stage,
+  axisSign: AxisSign,
+): Pick<CameraFraming, 'position' | 'target'> {
+  switch (stage) {
+    case 'line':
+      return { position: [LINE_POSITION[0], LINE_POSITION[1], LINE_POSITION[2] + 5], target: LINE_POSITION }
+    case 'plane': {
+      const target = planePosition(axisSign)
+      return { position: [target[0], target[1], target[2] + 5], target }
+    }
+    case 'cube': {
+      const target = cubePosition(axisSign)
+      const position: readonly [number, number, number] = [
+        target[0] + 3.5,
+        target[1] + 3.5 * axisSign.y,
+        target[2] + 4.5 * axisSign.z,
+      ]
+      return { position, target }
+    }
+    case 'reveal':
+    case 'closing':
+      return { position: CAMERA_FRAMING[stage].position, target: CAMERA_FRAMING[stage].target }
+  }
 }

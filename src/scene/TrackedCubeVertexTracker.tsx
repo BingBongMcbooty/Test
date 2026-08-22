@@ -1,9 +1,9 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import { SphereGeometry } from 'three'
 import { toCameraRelative, type Vec3Like } from '../math/cameraRelative'
 import { useDimensionsStore } from '../state/store'
-import { TRACKED_CUBE_VERTEX_COLOR, TRACKED_CUBE_VERTEX_WORLD } from './trackedCubeVertex'
+import { TRACKED_CUBE_VERTEX_COLOR, trackedCubeVertexWorld } from './trackedCubeVertex'
 
 const markerGeometry = new SphereGeometry(0.07, 16, 16)
 
@@ -59,8 +59,13 @@ export function TrackedCubeVertexTracker() {
   // `growthTransition.to === stage` reasoning `scene/Experience.tsx`'s `StageGeometry`
   // and `ArrowDrag.tsx`'s collider gating already use.
   const growthTransition = useDimensionsStore((state) => state.growthTransition)
+  const axisSign = useDimensionsStore((state) => state.axisSign)
   const active = stage === 'cube' && !growthTransition
   const lastRef = useRef<Vec3Like | null>(null)
+  // Post-Task-25: the tracked corner's own world position now depends on the live
+  // `axisSign` (which octant the cube actually mirrored into) — recomputed only when
+  // that sign actually changes, not every frame.
+  const vertexWorld = useMemo(() => trackedCubeVertexWorld(axisSign), [axisSign])
 
   useEffect(() => {
     if (!active) {
@@ -77,7 +82,7 @@ export function TrackedCubeVertexTracker() {
   // see `e2e/richness.spec.ts`'s frame-rate floor.
   useFrame(() => {
     if (!active) return
-    const next = toCameraRelative(TRACKED_CUBE_VERTEX_WORLD, camera)
+    const next = toCameraRelative(vertexWorld, camera)
     if (lastRef.current && roughlyEqual(lastRef.current, next)) return
     lastRef.current = next
     setTrackedCubeVertexCamera(next)
@@ -86,7 +91,7 @@ export function TrackedCubeVertexTracker() {
   if (!active) return null
 
   return (
-    <mesh geometry={markerGeometry} position={TRACKED_CUBE_VERTEX_WORLD}>
+    <mesh geometry={markerGeometry} position={vertexWorld}>
       <meshBasicMaterial color={TRACKED_CUBE_VERTEX_COLOR} />
     </mesh>
   )

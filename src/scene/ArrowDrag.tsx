@@ -3,8 +3,9 @@ import { useThree, type ThreeEvent } from '@react-three/fiber'
 import { BoxGeometry, CylinderGeometry, DoubleSide, PlaneGeometry, Plane, Raycaster, Vector2, Vector3 } from 'three'
 import { useDimensionsStore } from '../state/store'
 import { buildCameraFacingPlane, raycastPointerOntoPlane } from '../math/dragPlane'
+import { discoveredAxisSign } from '../math/growth'
 import { evaluateAttempt } from '../math/validation'
-import { SHAPE_POSITION } from './shapePositions'
+import { LINE_POSITION, cubePosition, planePosition } from './shapePositions'
 import { STAGE_CONFIG } from '../state/stageConfig'
 import { FAIL_CUE_DURATION, FailCueArrow } from './FailCueArrow'
 import { LiveArrow } from './LiveArrow'
@@ -22,8 +23,9 @@ const MIN_DRAG_LENGTH = 0.2
 // plane/cube's real fills are a comfortably tight fit for their wireframes — each stage
 // gets its own generously-sized invisible mesh rather than raycasting the visible
 // geometry directly. Module-scoped and reused across renders, same reasoning as
-// `LiveArrow`'s shared geometries. Positioned per-stage via `SHAPE_POSITION` (Task 16)
-// so each collider still sits exactly on top of its now-repositioned shape.
+// `LiveArrow`'s shared geometries. Positioned per-stage via `shapePositions.ts` (Task
+// 16; post-Task-25, plane/cube's position also mirrors with the live `axisSign`) so
+// each collider still sits exactly on top of its now-repositioned shape.
 const lineColliderGeometry = new CylinderGeometry(0.3, 0.3, 3.2, 8)
 const planeColliderGeometry = new PlaneGeometry(3.6, 3.6)
 const cubeColliderGeometry = new BoxGeometry(2.7, 2.7, 2.7)
@@ -60,6 +62,7 @@ export function ArrowDrag() {
   // `growthTransition.to` always equals `stage` whenever it's non-null (see
   // `state/store.ts`'s `advanceStage`), so a plain non-null check is enough here.
   const growthTransition = useDimensionsStore((state) => state.growthTransition)
+  const axisSign = useDimensionsStore((state) => state.axisSign)
 
   const camera = useThree((state) => state.camera)
   const gl = useThree((state) => state.gl)
@@ -149,6 +152,18 @@ export function ArrowDrag() {
       useDimensionsStore.getState().recordAttempt(result)
 
       if (result.success) {
+        // Post-Task-25: which sign (+y/-y, +z/-z) this particular passing drag actually
+        // demonstrated — recorded on *every* pass, not just the first, since Task 18
+        // lets the player keep passing/failing after their first pass and whichever
+        // direction they most recently demonstrated is the one the growth transition
+        // should honor when they eventually hit Continue. Stage 3 never reaches this
+        // (structurally can't pass — see below) so there's no third axis to record.
+        const discovery = discoveredAxisSign(
+          { x: dragVector.x, y: dragVector.y, z: dragVector.z },
+          STAGE_CONFIG[stage].occupiedAxes,
+        )
+        if (discovery) useDimensionsStore.getState().recordAxisDiscovery(discovery.axis, discovery.sign)
+
         // Task 18: Stages 1-2 no longer advance the instant a drag passes — flag it as
         // passed and let ui/StageContinue.tsx's manual button do the actual advance, so
         // the player can keep exploring (pass or fail again) in the meantime. Stage 3's
@@ -182,7 +197,7 @@ export function ArrowDrag() {
       {stage === 'line' && !growthTransition && (
         <mesh
           geometry={lineColliderGeometry}
-          position={SHAPE_POSITION.line}
+          position={LINE_POSITION}
           rotation={[0, 0, Math.PI / 2]}
           onPointerDown={handlePointerDown}
         >
@@ -192,7 +207,7 @@ export function ArrowDrag() {
       {stage === 'plane' && !growthTransition && (
         <mesh
           geometry={planeColliderGeometry}
-          position={SHAPE_POSITION.plane}
+          position={planePosition(axisSign)}
           onPointerDown={handlePointerDown}
         >
           <meshBasicMaterial transparent opacity={0} depthWrite={false} side={DoubleSide} />
@@ -201,7 +216,7 @@ export function ArrowDrag() {
       {stage === 'cube' && !growthTransition && (
         <mesh
           geometry={cubeColliderGeometry}
-          position={SHAPE_POSITION.cube}
+          position={cubePosition(axisSign)}
           onPointerDown={handlePointerDown}
         >
           <meshBasicMaterial transparent opacity={0} depthWrite={false} side={DoubleSide} />

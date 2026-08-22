@@ -9,7 +9,7 @@ import {
   applyRevealRotation,
   sliceTesseract,
 } from '../src/math/fourd'
-import { TRACKED_CUBE_VERTEX_WORLD } from '../src/scene/trackedCubeVertex'
+import { trackedCubeVertexWorld } from '../src/scene/trackedCubeVertex'
 import { TRACKED_VERTEX_INDEX } from '../src/scene/trackedVertex'
 
 interface CanvasPoint {
@@ -229,7 +229,11 @@ test.describe('live instrumentation panel (Stages 1-3)', () => {
     // tesseract's tracked vertex.
     const elements = await cameraMatrixElements(page)
     const fakeCamera = fakeCameraFromMatrixElements(elements)
-    const expected = toCameraRelative(TRACKED_CUBE_VERTEX_WORLD.clone(), fakeCamera)
+    // `debug-stage-cube` above is a debug jump (`setStage`), which always resets
+    // `axisSign` back to its default `{ y: 1, z: 1 }` — see `state/stageConfig.ts`'s
+    // `AxisSign` doc comment — so the tracked corner's world position here is the same
+    // canonical one this test always exercised, pre-Task-25 mirroring included.
+    const expected = toCameraRelative(trackedCubeVertexWorld({ y: 1, z: 1 }), fakeCamera)
 
     const xVal = firstNumber(await page.getByTestId('dimension-row-x').innerText())
     const yVal = firstNumber(await page.getByTestId('dimension-row-y').innerText())

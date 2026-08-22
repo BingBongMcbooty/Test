@@ -1,3 +1,5 @@
+import type { AxisSign } from '../state/stageConfig'
+
 /**
  * Task 16: each Stages 1-3 shape's translation from its old origin-centered position to
  * sitting fully within the positive octant, so it's actually enclosed by (rather than
@@ -7,16 +9,20 @@
  * `cameraFraming.ts`'s position/target and `ArrowDrag.tsx`'s collider position can reuse
  * the exact same vector.
  *
- * Translating the shape, its camera position+target, and its collider by one shared
- * vector is what keeps every pre-Task-16 drag/validation/instrumentation test passing
- * unmodified at the new coordinates: a camera translated by the same vector as the thing
- * it's looking at has an identical relative position/orientation/distance, so the
- * screen-to-world mapping a mouse drag goes through is only shifted, never reshaped —
- * the same NDC delta from canvas center still produces the same drag *vector* (a
- * difference between two points), which is all `math/validation.ts` ever reads.
+ * Post-Task-25 playtest feedback: the plane/cube positions below now take `axisSign`
+ * (`state/stageConfig.ts`) and mirror their `y`/`z` component to match, so the actual
+ * rendered shape lands wherever the player's own passing drag demonstrated rather than
+ * always the positive octant — see `state/stageConfig.ts`'s `AxisSign` doc comment for
+ * the full rationale. `axisSign = { y: 1, z: 1 }` (the default, and what every debug
+ * stage-jump resets to) reproduces the exact pre-existing positive-octant values, so
+ * every already-shipped test that jumps stages directly is unaffected.
  */
-export const SHAPE_POSITION: Record<'line' | 'plane' | 'cube', readonly [number, number, number]> = {
-  line: [1.5, 0, 0],
-  plane: [1.5, 1.5, 0],
-  cube: [1.25, 1.25, 1.25],
+export const LINE_POSITION: readonly [number, number, number] = [1.5, 0, 0]
+
+export function planePosition(axisSign: AxisSign): readonly [number, number, number] {
+  return [1.5, 1.5 * axisSign.y, 0]
+}
+
+export function cubePosition(axisSign: AxisSign): readonly [number, number, number] {
+  return [1.25, 1.25 * axisSign.y, 1.25 * axisSign.z]
 }

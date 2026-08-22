@@ -11,7 +11,12 @@ import { RevealDrag } from './RevealDrag'
 import { SliceWarmup } from './SliceWarmup'
 import { StageGrowthTransition } from './StageGrowthTransition'
 import { TrackedCubeVertexTracker } from './TrackedCubeVertexTracker'
-import { CAMERA_FRAMING, SPRING_BACK_SHARPNESS, easedTowardRange } from './cameraFraming'
+import {
+  CAMERA_FRAMING,
+  SPRING_BACK_SHARPNESS,
+  cameraPositionTarget,
+  easedTowardRange,
+} from './cameraFraming'
 import { cameraControlsRef } from './cameraControlsRef'
 import { LIGHT_RIG } from './materials'
 import { CubeStage } from './stages/CubeStage'
@@ -86,11 +91,16 @@ function SceneLights() {
 function CameraRig() {
   const controlsRef = useRef<CameraControlsImpl>(null)
   const stage = useDimensionsStore((state) => state.stage)
+  const axisSign = useDimensionsStore((state) => state.axisSign)
   const hasMountedRef = useRef(false)
   const framing = CAMERA_FRAMING[stage]
+  // Post-Task-25: `framing` above still supplies azimuth/polar ranges (axisSign-
+  // independent — see `cameraFraming.ts`'s `cameraPositionTarget` doc comment), but the
+  // actual position/target the camera gets pointed at now comes from this, so a
+  // mirrored Stage 2/3 shape gets a camera that's still framing it correctly.
+  const { position, target } = cameraPositionTarget(stage, axisSign)
 
   useEffect(() => {
-    const { position, target } = framing
     // `true` enables camera-controls' own smoothed transition — Task 5 cut this in as
     // an instant `setLookAt(..., false)`; Task 11 is where stage-advance actually
     // happens via player interaction, so the cut is replaced with a real transition.
@@ -103,7 +113,13 @@ function CameraRig() {
     // on being fully resolved. An instant cut on mount only, real transitions after.
     controlsRef.current?.setLookAt(...position, ...target, hasMountedRef.current)
     hasMountedRef.current = true
-  }, [stage, framing])
+    // `position`/`target` are fresh array literals every render (cameraPositionTarget()
+    // builds new tuples each call) — depending on `stage`/`axisSign` (whose identity
+    // only actually changes on a real stage change or axis discovery) instead of them
+    // directly is what keeps this effect from re-firing, and restarting the camera's
+    // in-flight transition, on every unrelated re-render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stage, axisSign])
 
   // Dev-only escape hatch, same spirit as store.ts's `window.__dimensionsStore` (Task
   // 14's note): lets e2e tests assert the camera's actual azimuth/polar/distance
