@@ -47,7 +47,7 @@ Status legend: ⬜ not started · 🔶 in progress · ✅ done
 
 ## Playtest follow-ups *(new session each — inserted after a direct user playtest of the Task 22 build; see PLAN.md's three new "post-Task-22" locked-decision rows and rationale paragraphs for what they lock in)*
 - ✅ Task 23 — Camera resistance/spring-back everywhere, instead of a per-stage hard lock — `worktree-agent-abff3af7f7676df66` @ `7a13af2`, **pushed straight to `claude/dimensional-exploration-app-uj20jy` (the default branch) on `origin`** — see note below (this session's sandbox, unlike the previous one, did have push access)
-- ✅ Task 24 — Instrumentation panel redesign: cursor-tracking, plain-language-first, richer per-stage data — `worktree-agent-a83accdf558901cdb` @ `c5c1d80`, merge/push attempted below
+- ✅ Task 24 — Instrumentation panel redesign: cursor-tracking, plain-language-first, richer per-stage data — `worktree-agent-a83accdf558901cdb` @ `6f726b3`, **pushed straight to `claude/dimensional-exploration-app-uj20jy` (the default branch) on `origin`** — clean fast-forward, `626c76f..6f726b3`, confirmed via `git ls-remote`
 - ⬜ Task 25 — Dimension-growth transitions between stages, and the "can't grow into the 4th, but here's its shadow" beat
 
 ## Regression & polish *(new session)*
