@@ -52,24 +52,25 @@ async function readGrowthTransition(page: Page): Promise<GrowthTransition> {
   )
 }
 
-// GROWTH_DURATION (math/growth.ts) is 0.6s. A single `canvas.screenshot()` round-trip
-// alone measured ~150-200ms in this sandbox's headless Chromium, and a Playwright
-// auto-waiting `expect(...).toBeVisible()` call measured ~300ms on top of that (both
-// confirmed via a throwaway timing script, not guessed) — comfortably fine on their
-// own, but stacking several of them *before* the "still mid-transition" checks below
-// eats enough of the budget to make those checks flaky. So the mid-transition checks
-// below capture their screenshot immediately after the click, before any other awaited
+// GROWTH_DURATION (math/growth.ts) is 2.5s (raised from an original 0.6s — see that
+// file's own note — after direct user feedback that the shorter duration read as an
+// abrupt pop rather than a visible grow). The poll timeout below is sized to that
+// duration with comfortable headroom (screenshot/assertion round-trips measured
+// ~150-500ms each in this sandbox's headless Chromium, negligible next to 2.5s) rather
+// than the tight budget the original 0.6s duration needed. The mid-transition checks
+// still capture their screenshot immediately after the click, before any other awaited
 // call gets a chance to eat into the window, and prove "visibly mid-grow" by comparing
 // that one frame against both endpoints (still-on-the-source-stage, and
 // fully-settled-on-the-destination-stage) rather than by comparing two separate
 // mid-transition frames against each other, which would need the budget twice over.
-// Even so, a `requestAnimationFrame`-driven animation this short can still occasionally
+// Even at 2.5s, a `requestAnimationFrame`-driven animation can in principle still
 // collapse into a single oversized frame under heavy CPU contention (several headless
 // browsers rendering WebGL at once, as the full Playwright suite does) — same category
 // of sandbox-specific timing flake already documented for other tests (see PROGRESS.md's
-// Task 7/23 notes on the frame-rate floor and the fail-cue timing race).
+// Task 7/23 notes on the frame-rate floor and the fail-cue timing race) — the longer
+// duration just makes it far less likely to matter in practice.
 async function waitForGrowthTransitionCleared(page: Page) {
-  await expect.poll(() => readGrowthTransition(page), { timeout: 3000 }).toBeNull()
+  await expect.poll(() => readGrowthTransition(page), { timeout: 6000 }).toBeNull()
 }
 
 test.describe('Task 25: dimension-growth transitions', () => {

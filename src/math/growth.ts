@@ -101,8 +101,15 @@ export function boxWireframeEdges(max: Corner): readonly (readonly [Corner, Corn
   ]
 }
 
-/** Duration of the growth animation, in seconds — tuned by eye (see PROGRESS.md). */
-export const GROWTH_DURATION = 0.6
+/**
+ * Duration of the growth animation, in seconds — tuned by eye (see PROGRESS.md).
+ * Originally 0.6s; raised to 2.5s after direct user feedback that the shorter duration
+ * read as an abrupt pop rather than a shape actually growing — at 2.5s `easeGrowth`'s
+ * smoothstep has enough real time to spread the sweep/extrude motion across, so a
+ * viewer can actually watch each edge move instead of catching only the eased-in start
+ * and eased-out end of a near-instant snap.
+ */
+export const GROWTH_DURATION = 2.5
 
 /**
  * Caps how much of `GROWTH_DURATION` a single animation frame can ever advance
@@ -114,7 +121,7 @@ export const GROWTH_DURATION = 0.6
  * source of full-suite flakiness in this sandbox, not just a hypothetical) could
  * silently swallow the *entire* growth duration in a single tick, making the animation
  * appear to teleport straight to its end state instead of actually playing. At
- * `GROWTH_DURATION = 0.6`, this guarantees at least `0.6 / 0.05 = 12` real frames
+ * `GROWTH_DURATION = 2.5`, this guarantees at least `2.5 / 0.05 = 50` real frames
  * always render before the animation can finish, no matter how stalled any individual
  * frame's real wall-clock delta was.
  */

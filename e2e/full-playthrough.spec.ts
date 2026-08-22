@@ -66,12 +66,15 @@ function readStoreState(page: Page): Promise<StoreState> {
 }
 
 // Same poll-for-null pattern growth-transition.spec.ts's own
-// `waitForGrowthTransitionCleared` uses — GROWTH_DURATION is 0.6s, clamped against a
-// single-frame-swallows-the-whole-animation race (see that file's/PROGRESS.md's Task 25
-// notes), so polling rather than a fixed wait is what that file's own precedent settled on.
+// `waitForGrowthTransitionCleared` uses — GROWTH_DURATION is 2.5s (raised from an
+// original 0.6s, see that file's/math/growth.ts's own notes), clamped against a
+// single-frame-swallows-the-whole-animation race (see PROGRESS.md's Task 25 notes), so
+// polling rather than a fixed wait is what that file's own precedent settled on. Timeout
+// sized to the 2.5s duration with headroom, same as growth-transition.spec.ts's copy of
+// this helper.
 async function waitForGrowthTransitionCleared(page: Page) {
   await expect
-    .poll(async () => (await readStoreState(page)).growthTransition, { timeout: 3000 })
+    .poll(async () => (await readStoreState(page)).growthTransition, { timeout: 6000 })
     .toBeNull()
 }
 
