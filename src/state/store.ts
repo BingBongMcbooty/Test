@@ -31,6 +31,34 @@ interface DimensionsState {
    */
   liveDragVector: Vec3 | null
   /**
+   * Task 24: the live cursor position, continuously tracked on Stages 1-2 regardless
+   * of whether a drag is happening — `scene/CursorTracker.tsx` raycasts every
+   * `pointermove` onto the world z=0 plane the line/plane shape itself lies in and
+   * writes the hit here, so `ui/DimensionPanel.tsx`'s x/y ledger (and Stage 1's
+   * on-scene marker dot, `scene/CursorMarker.tsx`) never go blank at rest the way
+   * `liveDragVector` above does — the whole point of this field is to be populated by
+   * a plain hover, no click required. `z` is always 0 here (the raycast target plane),
+   * kept only so this shares `Vec3`'s shape rather than inventing a 2-tuple type. Null
+   * whenever the stage isn't line/plane (Stage 3 uses `trackedCubeVertexCamera` below
+   * instead) or the pointer hasn't moved yet this stage.
+   */
+  liveCursorPoint: Vec3 | null
+  /**
+   * Task 24: Stage 3's tracked-cube-vertex readout, expressed in the *camera's* own
+   * view frame rather than world space — confirmed directly by the user (this
+   * session's environment didn't have `AskUserQuestion` available, so the question and
+   * answer happened via the coordinator relaying it — see PROGRESS.md) after PLAN.md
+   * flagged this as needing a real decision rather than a guess: the cube itself never
+   * rotates in world space, only the camera orbits around it (Task 17's D-pad), so
+   * `TRACKED_CUBE_VERTEX_WORLD`'s raw coordinates never change on their own —
+   * recomputing it relative to the camera every frame
+   * (`scene/TrackedCubeVertexTracker.tsx`, `math/cameraRelative.ts`) is what makes
+   * this readout visibly change as the player orbits, mirroring how the tesseract's
+   * own tracked vertex changes under a real 4D rotation in Stage 4. Null whenever the
+   * stage isn't cube, or before the camera has rendered a first frame.
+   */
+  trackedCubeVertexCamera: Vec3 | null
+  /**
    * Task 18: Stages 1-2 no longer advance the instant a drag passes — `ArrowDrag.tsx`
    * sets this (via `markStagePassed`) on the first passing drag this stage instead of
    * calling `advanceStage()` directly, and `ui/StageContinue.tsx` shows a manual
@@ -71,6 +99,8 @@ interface DimensionsState {
   recordAttempt: (result: AttemptResult) => void
   markStagePassed: () => void
   setLiveDragVector: (vector: Vec3 | null) => void
+  setLiveCursorPoint: (point: Vec3 | null) => void
+  setTrackedCubeVertexCamera: (point: Vec3 | null) => void
   toggleRevealView: () => void
   rotateRevealXW: (deltaAngle: number) => void
   rotateRevealYW: (deltaAngle: number) => void
@@ -85,6 +115,8 @@ const initialState = {
   isDrawing: false,
   lastResult: null as AttemptResult | null,
   liveDragVector: null as Vec3 | null,
+  liveCursorPoint: null as Vec3 | null,
+  trackedCubeVertexCamera: null as Vec3 | null,
   stagePassed: false,
   revealView: 'slice' as RevealView,
   revealRotationXW: 0,
@@ -107,6 +139,8 @@ export const useDimensionsStore = create<DimensionsState>((set) => ({
       isDrawing: false,
       lastResult: null,
       liveDragVector: null,
+      liveCursorPoint: null,
+      trackedCubeVertexCamera: null,
       stagePassed: false,
       revealWarmupActive: false,
     }),
@@ -120,6 +154,8 @@ export const useDimensionsStore = create<DimensionsState>((set) => ({
         isDrawing: false,
         lastResult: null,
         liveDragVector: null,
+        liveCursorPoint: null,
+        trackedCubeVertexCamera: null,
         stagePassed: false,
         revealWarmupActive: stage === 'reveal',
       }
@@ -139,6 +175,10 @@ export const useDimensionsStore = create<DimensionsState>((set) => ({
   markStagePassed: () => set({ stagePassed: true }),
 
   setLiveDragVector: (vector) => set({ liveDragVector: vector }),
+
+  setLiveCursorPoint: (point) => set({ liveCursorPoint: point }),
+
+  setTrackedCubeVertexCamera: (point) => set({ trackedCubeVertexCamera: point }),
 
   // Task 21: cycles slice -> projection -> chirality -> slice, rather than a binary flip
   // — see `stageConfig.ts`'s `REVEAL_VIEW_ORDER`/`nextRevealView`.

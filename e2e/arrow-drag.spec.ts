@@ -43,6 +43,19 @@ test.describe('pointer/drag controller', () => {
     await expect(page.locator('canvas')).toBeVisible()
     await page.waitForTimeout(300)
 
+    // Task 24: Stage 1 now renders a persistent cursor-projection marker
+    // (`CursorMarker.tsx`) wherever `liveCursorPoint` last landed, updated by a plain
+    // `pointermove` with no click required — so "at rest" is no longer independent of
+    // pointer position the way it was pre-Task-24. Parking the pointer at one fixed,
+    // known point *before* capturing `atRest` (a real move, not the untouched default
+    // position) and returning it to that exact same point before `afterRelease` keeps
+    // the marker in an identical spot in both snapshots, so this pixel comparison still
+    // isolates what it always meant to: the drag arrow and camera state, not the
+    // now-separately-live cursor marker.
+    const restPoint = await canvasCorner(page)
+    await page.mouse.move(restPoint.x, restPoint.y)
+    await page.waitForTimeout(100)
+
     // Line stage's material is fully static (no time-driven shader, unlike plane/cube),
     // so at rest its rendering never changes on its own — any pixel difference below is
     // attributable to the drag interaction, not ambient animation.
@@ -65,6 +78,11 @@ test.describe('pointer/drag controller', () => {
     // Task 11's fail cue (FAIL_CUE_DURATION = 0.45s) briefly lingers after release —
     // wait for it to fully fade before checking the scene settled back to rest.
     await page.waitForTimeout(700)
+
+    // Return the pointer to the exact same resting spot used for `atRest` above (see
+    // this test's Task 24 note) before re-snapshotting.
+    await page.mouse.move(restPoint.x, restPoint.y)
+    await page.waitForTimeout(100)
 
     // CameraControls was disabled for the drag and never moved, the fail cue has
     // finished fading, and the live arrow clears on release — the scene should look
@@ -97,7 +115,11 @@ test.describe('pointer/drag controller', () => {
     // `waitForCameraSettled` reasoning.
     const readCameraState = () =>
       page.evaluate(() => {
-        const c = (window as unknown as { __cameraControls: { azimuthAngle: number; polarAngle: number; distance: number } }).__cameraControls
+        const c = (
+          window as unknown as {
+            __cameraControls: { azimuthAngle: number; polarAngle: number; distance: number }
+          }
+        ).__cameraControls
         return { azimuthAngle: c.azimuthAngle, polarAngle: c.polarAngle, distance: c.distance }
       })
     async function waitForSettled() {
@@ -107,7 +129,9 @@ test.describe('pointer/drag controller', () => {
       // pre-existing flake orbit.spec.ts's `waitForCameraControls` documents.
       await expect
         .poll(() =>
-          page.evaluate(() => Boolean((window as unknown as { __cameraControls?: unknown }).__cameraControls)),
+          page.evaluate(() =>
+            Boolean((window as unknown as { __cameraControls?: unknown }).__cameraControls),
+          ),
         )
         .toBe(true)
       let previous = await readCameraState()

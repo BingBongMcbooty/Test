@@ -1,3 +1,4 @@
+import type { CSSProperties } from 'react'
 import {
   PROJECTION_VIEWER_DISTANCE,
   TESSERACT_EDGES,
@@ -9,10 +10,9 @@ import {
 import { evaluateAttempt } from '../math/validation'
 import { TRACKED_VERTEX_COLOR, TRACKED_VERTEX_INDEX } from '../scene/trackedVertex'
 import { useDimensionsStore } from '../state/store'
-import { STAGE_CONFIG, STAGE_SHAPE_COUNTS, type Axis } from '../state/stageConfig'
+import { STAGE_CONFIG, STAGE_SHAPE_COUNTS, type Axis, type Stage } from '../state/stageConfig'
 
 const AXES: readonly Axis[] = ['x', 'y', 'z']
-const LOCKED_LABEL = 'Unknown, unreachable'
 /** A real value that exists, but the current view's lens doesn't show it — see Task 19. */
 const SLICED_AWAY_LABEL = 'sliced away'
 const HIDDEN_BEHIND_SHADOW_LABEL = 'hidden behind the shadow'
@@ -30,10 +30,17 @@ const panelContainerStyle = {
   top: '1.5rem',
   right: '1.5rem',
   minWidth: '11rem',
+  // Task 24 fix: this had no cap at all, so the reveal stage's chirality-view note
+  // (`dimension-chirality-note`, a full sentence) grew the panel wide enough to
+  // overlap the centered header prompt (`ui/HUD.tsx`) at typical viewport widths.
+  // Every row already wraps by default (plain `div`s, no `whiteSpace: 'nowrap'`
+  // anywhere in this file) — a `maxWidth` alone is enough to force that wrapping
+  // instead of letting content dictate the box's width.
+  maxWidth: '14rem',
   padding: '0.75rem 1rem',
   display: 'flex',
   flexDirection: 'column',
-  gap: '0.35rem',
+  gap: '0.5rem',
   fontFamily: 'ui-monospace, "SF Mono", Menlo, monospace',
   fontSize: '0.72rem',
   letterSpacing: '0.02em',
@@ -43,6 +50,86 @@ const panelContainerStyle = {
   borderRadius: '0.5rem',
   pointerEvents: 'none',
 } as const
+
+/**
+ * Task 24: the panel's shared row shape — a plain-language description first
+ * (`primary`, sized/colored as the visually dominant line), the old terse mathematical
+ * notation demoted to small, dim subtext underneath (`notation`) rather than the
+ * primary visual element it was through Task 19. Every row in this file (locked axes,
+ * live axis values, the distance formula, the orthogonality ratio, shape counts, and
+ * the Stage 4 panel's own rotation/slice/tracked-vertex rows) goes through this one
+ * component so the hierarchy is consistent everywhere, not just on the rows Task 24
+ * happened to add new data for.
+ */
+function PanelRow({
+  testId,
+  primary,
+  notation,
+  color,
+  dim,
+}: {
+  testId?: string
+  primary: string
+  notation: string
+  color?: string
+  dim?: boolean
+}) {
+  const style: CSSProperties = { opacity: dim ? 0.5 : 1, color }
+  return (
+    <div data-testid={testId} style={style}>
+      <div>{primary}</div>
+      <div style={{ fontSize: '0.6rem', opacity: 0.6, marginTop: '0.1rem' }}>[{notation}]</div>
+    </div>
+  )
+}
+
+/**
+ * Task 24: plain-language framing for a locked (structurally unreachable) axis, kept
+ * uniform across stages/axes rather than hand-written per case — the notation subtext
+ * (`[y]`, `[w]`, etc.) is what actually says which axis, so the primary text doesn't
+ * need to repeat it.
+ */
+const LOCKED_PRIMARY = 'Outside this world — no direction here yet'
+
+type DragStage = Extract<Stage, 'line' | 'plane' | 'cube'>
+
+/**
+ * Task 24: plain-language description for each stage's per-axis live readout.
+ * Stages 1-2 are the cursor's continuous projection (`liveCursorPoint`,
+ * `CursorTracker.tsx`); Stage 3 is a tracked cube corner's position relative to the
+ * *camera's* current view (`trackedCubeVertexCamera`, `TrackedCubeVertexTracker.tsx`)
+ * — confirmed directly by the user (see PROGRESS.md) since the cube itself never
+ * rotates in world space, only the camera orbits around it, so a world-space reading
+ * would just be a constant that never changes.
+ */
+const AXIS_LIVE_LABEL: Record<DragStage, Partial<Record<Axis, string>>> = {
+  line: { x: 'Where your cursor lands on the line' },
+  plane: {
+    x: 'Left-right position on the plane',
+    y: 'Up-down position on the plane',
+  },
+  cube: {
+    x: 'Tracked corner, left-right from here',
+    y: 'Tracked corner, up-down from here',
+    z: 'Tracked corner, near-far from here',
+  },
+}
+
+/** Task 24: plain-language description for each stage's distance/orthogonality rows. */
+const ATTEMPT_LABEL: Record<DragStage, { distance: string; orthogonality: string }> = {
+  line: {
+    distance: 'How far you dragged along the line',
+    orthogonality: 'How much of that drag left the line',
+  },
+  plane: {
+    distance: 'How far you dragged within the plane',
+    orthogonality: 'How much of that drag left the plane',
+  },
+  cube: {
+    distance: 'How far you dragged within the cube',
+    orthogonality: 'How much of that drag left the cube',
+  },
+}
 
 /**
  * Task 19: extends the panel for the reveal stage — rotation (in degrees, per PLAN.md,
@@ -141,24 +228,42 @@ function RevealDimensionPanel() {
 }
 
 /**
- * Task 15: an always-visible x/y/z/w axis ledger, live from Stage 1 on — see PLAN.md's
- * "Live instrumentation" locked decision. `w` is always locked pre-reveal, so it's
- * rendered directly rather than looped with `AXES`. An unlocked axis with no drag yet
- * this stage renders no row at all (`liveDragVector === null`) rather than a zero or a
- * blank — three different kinds of "no data" (locked, not-yet-shown, never-attempted),
- * per PLAN.md's tunables section, get three different treatments; Task 19 adds the
- * "sliced away"/"hidden behind the shadow" pair for Stage 4's two views.
+ * Task 15/24: an always-visible x/y/z/w axis ledger, live from Stage 1 on — see
+ * PLAN.md's "Live instrumentation" and "Cursor-tracking, plain-language-first
+ * instrumentation" locked decisions. `w` is always locked pre-reveal, so it's rendered
+ * directly rather than looped with `AXES`; Task 19 adds the "sliced away"/"hidden
+ * behind the shadow" pair for Stage 4's two views.
+ *
+ * Task 24 changed what drives the occupied-axis rows on every stage: they used to go
+ * blank between drags (`liveDragVector === null` at rest) and are now continuously
+ * live regardless of whether anything is actively being dragged — Stages 1-2 off
+ * `liveCursorPoint` (`CursorTracker.tsx`'s plain-hover raycast, no click required),
+ * Stage 3 off `trackedCubeVertexCamera` (`TrackedCubeVertexTracker.tsx`'s per-frame
+ * camera-relative reading of one fixed cube corner — see that file and `store.ts`'s
+ * doc comment for why "relative to the camera" rather than a world-space constant). A
+ * real "nothing to report yet" state (Stages 1-2 only, before the first pointer move)
+ * renders as `—` rather than hiding the row entirely, since a plain-language-first
+ * panel should always show the reader *what* it's telling them even when it has
+ * nothing to report yet. Stage 3's rows share the same cyan (`TRACKED_VERTEX_COLOR`)
+ * as its on-scene marker and Task 19's tesseract equivalent — the same "the number and
+ * the point read as one thing" connection, reused verbatim one dimension earlier.
  *
  * The distance formula and orthogonality ratio both reuse `evaluateAttempt` directly
  * against the current stage's `occupiedAxes` rather than re-deriving the math, so the
  * live number shown mid-drag is exactly what pointer-up will use to decide pass/fail
- * (`ArrowDrag.tsx` calls the same function). Vertex/edge counts are static per stage —
- * see `STAGE_SHAPE_COUNTS`'s doc comment for the doubling pattern they build toward.
+ * (`ArrowDrag.tsx` calls the same function) — these two rows stay drag-gated (`—` at
+ * rest) on purpose, unlike the axis ledger above: `evaluateAttempt` is inherently a
+ * function of a *drag vector* (two points), not a single cursor position, so there's
+ * no meaningful "continuous" version of it the way there is for a live coordinate.
+ * Vertex/edge counts are static per stage — see `STAGE_SHAPE_COUNTS`'s doc comment for
+ * the doubling pattern they build toward.
  */
 export function DimensionPanel() {
   const stage = useDimensionsStore((state) => state.stage)
   const revealWarmupActive = useDimensionsStore((state) => state.revealWarmupActive)
   const liveDragVector = useDimensionsStore((state) => state.liveDragVector)
+  const liveCursorPoint = useDimensionsStore((state) => state.liveCursorPoint)
+  const trackedCubeVertexCamera = useDimensionsStore((state) => state.trackedCubeVertexCamera)
 
   // Task 20: the cone warm-up isn't the tesseract, so its rotation/slice-offset/tracked-
   // vertex readouts would be stale/meaningless here — no panel at all while it's active,
@@ -169,6 +274,7 @@ export function DimensionPanel() {
   // 'closing' isn't a hypercube-slice shape in this sense and gets no panel at all.
   if (!shapeCounts) return null
 
+  const dragStage = stage as DragStage
   const { occupiedAxes } = STAGE_CONFIG[stage]
   const result = liveDragVector ? evaluateAttempt(liveDragVector, occupiedAxes) : null
   const distance = liveDragVector
@@ -179,36 +285,60 @@ export function DimensionPanel() {
       ? `|${occupiedAxes[0]}|`
       : `√(${occupiedAxes.map((axis) => `${axis}²`).join('+')})`
 
+  // Task 24: Stages 1-2's continuous cursor projection; Stage 3's camera-relative
+  // tracked-vertex reading — see this component's own doc comment above.
+  function liveAxisValue(axis: Axis): number | null {
+    if (dragStage === 'line' || dragStage === 'plane') {
+      return liveCursorPoint ? liveCursorPoint[axis] : null
+    }
+    return trackedCubeVertexCamera ? trackedCubeVertexCamera[axis] : null
+  }
+
   return (
     <div data-testid="dimension-panel" style={panelContainerStyle}>
       {AXES.map((axis) => {
         if (!occupiedAxes.includes(axis)) {
           return (
-            <div key={axis} data-testid={`dimension-row-${axis}`} style={{ opacity: 0.5 }}>
-              {axis}: {LOCKED_LABEL}
-            </div>
+            <PanelRow
+              key={axis}
+              testId={`dimension-row-${axis}`}
+              primary={LOCKED_PRIMARY}
+              notation={axis}
+              dim
+            />
           )
         }
-        if (!liveDragVector) return null
+        const value = liveAxisValue(axis)
+        const primary = AXIS_LIVE_LABEL[dragStage][axis] ?? axis
         return (
-          <div key={axis} data-testid={`dimension-row-${axis}`}>
-            {axis}: {formatNumber(liveDragVector[axis])}
-          </div>
+          <PanelRow
+            key={axis}
+            testId={`dimension-row-${axis}`}
+            primary={`${primary}: ${value === null ? '—' : formatNumber(value)}`}
+            notation={axis}
+            color={dragStage === 'cube' ? TRACKED_VERTEX_COLOR : undefined}
+          />
         )
       })}
-      <div data-testid="dimension-row-w" style={{ opacity: 0.5 }}>
-        w: {LOCKED_LABEL}
-      </div>
+      <PanelRow testId="dimension-row-w" primary={LOCKED_PRIMARY} notation="w" dim />
 
-      <div style={{ marginTop: '0.25rem', opacity: 0.75 }}>
-        {distanceFormula} = {distance === null ? '—' : formatNumber(distance)}
-      </div>
-      <div data-testid="dimension-orthogonality" style={{ opacity: 0.75 }}>
-        orthogonality: {result === null ? '—' : formatNumber(result.orthogonalityRatio)}
-      </div>
-      <div data-testid="dimension-shape-counts" style={{ marginTop: '0.25rem', opacity: 0.55 }}>
-        {shapeCounts.vertices}v · {shapeCounts.edges}e
-      </div>
+      <PanelRow
+        primary={`${ATTEMPT_LABEL[dragStage].distance}: ${distance === null ? '—' : formatNumber(distance)}`}
+        notation={`${distanceFormula} = ${distance === null ? '—' : formatNumber(distance)}`}
+        dim
+      />
+      <PanelRow
+        testId="dimension-orthogonality"
+        primary={`${ATTEMPT_LABEL[dragStage].orthogonality}: ${result === null ? '—' : formatNumber(result.orthogonalityRatio)}`}
+        notation={`orthogonality = ${result === null ? '—' : formatNumber(result.orthogonalityRatio)}`}
+        dim
+      />
+      <PanelRow
+        testId="dimension-shape-counts"
+        primary={`This shape has ${shapeCounts.vertices} corners and ${shapeCounts.edges} edges`}
+        notation={`${shapeCounts.vertices}v · ${shapeCounts.edges}e`}
+        dim
+      />
     </div>
   )
 }

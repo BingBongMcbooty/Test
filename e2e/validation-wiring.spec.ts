@@ -17,6 +17,18 @@ async function canvasCenter(page: Page): Promise<CanvasPoint> {
   return { x: box.x + box.width / 2, y: box.y + box.height / 2 }
 }
 
+// Task 24: a fixed point (mirroring arrow-drag.spec.ts's own `canvasCorner`) used only
+// to park the pointer at an identical spot before *and* after a drag in the
+// pixel-exact "back to rest" test below — Stage 1 now renders a persistent
+// `CursorMarker.tsx` dot wherever the pointer last landed (Task 24: continuous cursor
+// tracking, no click required), so an "at rest" pixel comparison needs the pointer
+// pinned to one known location in both snapshots, not merely untouched.
+async function canvasCorner(page: Page): Promise<CanvasPoint> {
+  const box = await page.locator('canvas').boundingBox()
+  if (!box) throw new Error('canvas has no bounding box')
+  return { x: box.x + box.width * 0.08, y: box.y + box.height * 0.08 }
+}
+
 async function dragFrom(page: Page, from: CanvasPoint, dx: number, dy: number) {
   await page.mouse.move(from.x, from.y)
   await page.mouse.down()
@@ -118,6 +130,12 @@ test.describe('validation wiring (Stages 1 & 2)', () => {
     await expect(page.locator('canvas')).toBeVisible()
     await page.waitForTimeout(300)
 
+    // Task 24: park the pointer at a fixed, known point before capturing `atRest` — see
+    // `canvasCorner`'s doc comment above.
+    const restPoint = await canvasCorner(page)
+    await page.mouse.move(restPoint.x, restPoint.y)
+    await page.waitForTimeout(100)
+
     const atRest = await canvasSnapshot(page)
 
     const center = await canvasCenter(page)
@@ -137,8 +155,12 @@ test.describe('validation wiring (Stages 1 & 2)', () => {
     // Once the cue finishes fading (FAIL_CUE_DURATION = 0.45s), the scene returns to
     // exactly its pre-drag state — nothing lingers, camera never moved. Line stage's
     // material is fully static (no time-driven shader, unlike plane/cube — see Task
-    // 7's notes), so this pixel-exact comparison is safe here.
+    // 7's notes), so this pixel-exact comparison is safe here. Return the pointer to
+    // the same `restPoint` used for `atRest` first (Task 24 note above) so the
+    // persistent cursor marker doesn't itself register as a difference.
     await page.waitForTimeout(700)
+    await page.mouse.move(restPoint.x, restPoint.y)
+    await page.waitForTimeout(100)
     const afterCue = await canvasSnapshot(page)
     expect(afterCue).toEqual(atRest)
 

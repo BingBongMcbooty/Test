@@ -175,6 +175,50 @@ describe('setLiveDragVector', () => {
   })
 })
 
+describe('setLiveCursorPoint', () => {
+  it('sets and clears the live cursor readout value', () => {
+    getState().setLiveCursorPoint({ x: 1, y: 2, z: 0 })
+    expect(getState().liveCursorPoint).toEqual({ x: 1, y: 2, z: 0 })
+    getState().setLiveCursorPoint(null)
+    expect(getState().liveCursorPoint).toBeNull()
+  })
+
+  it('is cleared on setStage and advanceStage, like the other per-stage fields', () => {
+    getState().setLiveCursorPoint({ x: 1, y: 2, z: 0 })
+    getState().setStage('cube')
+    expect(getState().liveCursorPoint).toBeNull()
+
+    getState().setLiveCursorPoint({ x: 1, y: 2, z: 0 })
+    getState().advanceStage()
+    expect(getState().liveCursorPoint).toBeNull()
+  })
+
+  it('is independent of liveDragVector — a plain cursor move never touches the drag field', () => {
+    getState().setLiveCursorPoint({ x: 1, y: 2, z: 0 })
+    expect(getState().liveDragVector).toBeNull()
+  })
+})
+
+describe('setTrackedCubeVertexCamera', () => {
+  it('sets and clears the camera-relative tracked-vertex readout', () => {
+    getState().setTrackedCubeVertexCamera({ x: 1, y: 2, z: -9 })
+    expect(getState().trackedCubeVertexCamera).toEqual({ x: 1, y: 2, z: -9 })
+    getState().setTrackedCubeVertexCamera(null)
+    expect(getState().trackedCubeVertexCamera).toBeNull()
+  })
+
+  it('is cleared on setStage and advanceStage, like the other per-stage fields', () => {
+    getState().setTrackedCubeVertexCamera({ x: 1, y: 2, z: -9 })
+    getState().setStage('line')
+    expect(getState().trackedCubeVertexCamera).toBeNull()
+
+    getState().setStage('cube')
+    getState().setTrackedCubeVertexCamera({ x: 1, y: 2, z: -9 })
+    getState().advanceStage()
+    expect(getState().trackedCubeVertexCamera).toBeNull()
+  })
+})
+
 describe('toggleRevealView', () => {
   it('cycles slice -> projection -> chirality -> slice', () => {
     expect(getState().revealView).toBe('slice')

@@ -4,9 +4,12 @@ import { useEffect, useRef } from 'react'
 import { useDimensionsStore } from '../state/store'
 import { ArrowDrag } from './ArrowDrag'
 import { ChiralityDemo } from './ChiralityDemo'
+import { CursorMarker } from './CursorMarker'
+import { CursorTracker } from './CursorTracker'
 import { Grid } from './Grid'
 import { RevealDrag } from './RevealDrag'
 import { SliceWarmup } from './SliceWarmup'
+import { TrackedCubeVertexTracker } from './TrackedCubeVertexTracker'
 import { CAMERA_FRAMING, SPRING_BACK_SHARPNESS, easedTowardRange } from './cameraFraming'
 import { cameraControlsRef } from './cameraControlsRef'
 import { LIGHT_RIG } from './materials'
@@ -178,6 +181,9 @@ export function Experience() {
       <CameraRig />
       <ArrowDrag />
       <RevealDrag />
+      <CursorTracker />
+      <CursorMarker />
+      <TrackedCubeVertexTracker />
     </Canvas>
   )
 }
