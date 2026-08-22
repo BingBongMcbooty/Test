@@ -112,37 +112,47 @@ describe('recordAttempt', () => {
   })
 })
 
-describe('markStagePassed / stagePassed', () => {
-  it('starts false and flips true when marked', () => {
-    expect(getState().stagePassed).toBe(false)
-    getState().markStagePassed()
-    expect(getState().stagePassed).toBe(true)
+describe('showStageWelcome / dismissStageWelcome (post-Task-18-removal: the auto-advance welcome beat)', () => {
+  it('starts true — a fresh load welcomes the player to the 1st dimension with no advanceStage() call needed', () => {
+    expect(getState().stage).toBe('line')
+    expect(getState().showStageWelcome).toBe(true)
   })
 
-  it('is not reset by a later recordAttempt, including a failing one', () => {
-    getState().markStagePassed()
-    getState().recordAttempt({
-      success: false,
-      axisContributions: { x: 1, y: 0, z: 0 },
-      orthogonalityRatio: 0.2,
-    })
-    expect(getState().stagePassed).toBe(true)
+  it('advanceStage sets it true landing on plane or cube', () => {
+    getState().dismissStageWelcome()
+    getState().advanceStage() // -> plane
+    expect(getState().showStageWelcome).toBe(true)
+    getState().dismissStageWelcome()
+    getState().advanceStage() // -> cube
+    expect(getState().showStageWelcome).toBe(true)
   })
 
-  it('is cleared on setStage and advanceStage, like the other per-stage fields', () => {
-    getState().markStagePassed()
+  it('advanceStage does NOT set it for cube->reveal or reveal->closing — no 4th dimension to welcome the player into', () => {
     getState().setStage('cube')
-    expect(getState().stagePassed).toBe(false)
-
-    getState().markStagePassed()
-    getState().advanceStage()
-    expect(getState().stagePassed).toBe(false)
+    getState().advanceStage() // -> reveal
+    expect(getState().showStageWelcome).toBe(false)
+    getState().advanceStage() // -> closing
+    expect(getState().showStageWelcome).toBe(false)
   })
 
-  it('is cleared by reset', () => {
-    getState().markStagePassed()
+  it('setStage always clears it — a debug jump is never a real arrival', () => {
+    getState().setStage('plane')
+    expect(getState().showStageWelcome).toBe(false)
+  })
+
+  it('dismissStageWelcome clears it without touching the stage', () => {
+    expect(getState().showStageWelcome).toBe(true)
+    getState().dismissStageWelcome()
+    expect(getState().showStageWelcome).toBe(false)
+    expect(getState().stage).toBe('line')
+  })
+
+  it('reset restores it to true, alongside Stage 1', () => {
+    getState().dismissStageWelcome()
+    getState().setStage('cube')
     getState().reset()
-    expect(getState().stagePassed).toBe(false)
+    expect(getState().stage).toBe('line')
+    expect(getState().showStageWelcome).toBe(true)
   })
 })
 

@@ -61,15 +61,23 @@ interface DimensionsState {
    */
   trackedCubeVertexCamera: Vec3 | null
   /**
-   * Task 18: Stages 1-2 no longer advance the instant a drag passes — `ArrowDrag.tsx`
-   * sets this (via `markStagePassed`) on the first passing drag this stage instead of
-   * calling `advanceStage()` directly, and `ui/StageContinue.tsx` shows a manual
-   * "Continue" button once it's true. Deliberately untouched by `recordAttempt` — a
-   * later failed attempt on the same stage (the player exploring further, per the "no
-   * artificial lock" locked decision) must not un-pass it and hide the button. Reset to
-   * `false` alongside the other per-stage fields on `setStage`/`advanceStage`/`reset`.
+   * Post-Task-18-removal: a pass now auto-advances straight through the growth
+   * animation with no Continue button to pause the player on — this is the beat that
+   * replaces it. True exactly when Stage 1/2/3 (never reveal/closing — there's no 4th
+   * dimension to welcome the player *into*, which would directly contradict the app's
+   * whole point at exactly the boundary that makes it) was just arrived at via *real*
+   * progression: the initial `line` value below (so a fresh page load/`reset()` also
+   * welcomes the player to the 1st dimension, since there's no `advanceStage()` call to
+   * produce that one), or `advanceStage()` landing on plane/cube. `setStage()` (debug
+   * jumps) always clears it to `false` — jumping stages for testing/navigation
+   * convenience was never a real arrival, mirroring `growthTransition`'s/
+   * `revealWarmupActive`'s own "only real progression triggers this" rule.
+   * `ui/DimensionWelcome.tsx` reads this to decide whether to mount at all, then runs
+   * its own fade-in/hold/fade-out entirely locally, calling `dismissStageWelcome()`
+   * only once that's finished — the store doesn't own the animation's timing, just
+   * whether a fresh one should play at all.
    */
-  stagePassed: boolean
+  showStageWelcome: boolean
   revealView: RevealView
   /**
    * xw-plane rotation angle (radians) — the default drag rotation, see RevealDrag.tsx.
@@ -121,11 +129,11 @@ interface DimensionsState {
    * colliders, `scene/stages/{Plane,Cube}Stage.tsx`, `scene/Grid.tsx`,
    * `scene/cameraFraming.ts`'s `cameraPositionTarget`, and `scene/StageGrowthTransition.tsx`
    * — everywhere the fixed "always grows +y then +z" constants used to be read directly.
-   * `recordAxisDiscovery` is the only setter; it's called from `ArrowDrag.tsx` on every
-   * *passing* drag (not just the first — Task 18 lets a player keep passing/failing
-   * after their first pass, and whichever direction they most recently demonstrated is
-   * the one that should grow), so it can change more than once before `advanceStage()`
-   * actually plays the animation. `setStage()` (debug jumps) and `reset()` both restore
+   * `recordAxisDiscovery` is the only setter; `ArrowDrag.tsx` calls it immediately
+   * before `advanceStage()` on the one passing drag that ends each stage (post-Task-18
+   * removal, a pass advances right away — see `advanceStage`'s own doc comment), so the
+   * sign it just recorded is always exactly what that same call's growth transition
+   * needs to honor. `setStage()` (debug jumps) and `reset()` both restore
    * `DEFAULT_AXIS_SIGN` — jumping stages for testing/navigation convenience was never a
    * real discovery, mirroring `growthTransition`'s/`revealWarmupActive`'s own "only real
    * progression triggers this" rule. `advanceStage()` deliberately leaves it untouched:
@@ -140,7 +148,6 @@ interface DimensionsState {
   startDrawing: () => void
   endDrawing: () => void
   recordAttempt: (result: AttemptResult) => void
-  markStagePassed: () => void
   setLiveDragVector: (vector: Vec3 | null) => void
   setLiveCursorPoint: (point: Vec3 | null) => void
   setTrackedCubeVertexCamera: (point: Vec3 | null) => void
@@ -151,6 +158,7 @@ interface DimensionsState {
   finishRevealWarmup: () => void
   finishGrowthTransition: () => void
   recordAxisDiscovery: (axis: 'y' | 'z', sign: 1 | -1) => void
+  dismissStageWelcome: () => void
   reset: () => void
 }
 
@@ -162,7 +170,7 @@ const initialState = {
   liveDragVector: null as Vec3 | null,
   liveCursorPoint: null as Vec3 | null,
   trackedCubeVertexCamera: null as Vec3 | null,
-  stagePassed: false,
+  showStageWelcome: true,
   revealView: 'slice' as RevealView,
   revealRotationXW: 0,
   revealRotationYW: 0,
@@ -188,7 +196,7 @@ export const useDimensionsStore = create<DimensionsState>((set) => ({
       liveDragVector: null,
       liveCursorPoint: null,
       trackedCubeVertexCamera: null,
-      stagePassed: false,
+      showStageWelcome: false,
       revealWarmupActive: false,
       growthTransition: null,
       axisSign: DEFAULT_AXIS_SIGN,
@@ -212,7 +220,9 @@ export const useDimensionsStore = create<DimensionsState>((set) => ({
         liveDragVector: null,
         liveCursorPoint: null,
         trackedCubeVertexCamera: null,
-        stagePassed: false,
+        // See `showStageWelcome`'s own doc comment: only line/plane/cube ever welcome
+        // the player, never reveal/closing.
+        showStageWelcome: stage === 'line' || stage === 'plane' || stage === 'cube',
         revealWarmupActive: stage === 'reveal',
         growthTransition: isGrowthEdge ? { from: state.stage, to: stage } : null,
       }
@@ -228,8 +238,6 @@ export const useDimensionsStore = create<DimensionsState>((set) => ({
       attempts: state.attempts + 1,
       isDrawing: false,
     })),
-
-  markStagePassed: () => set({ stagePassed: true }),
 
   setLiveDragVector: (vector) => set({ liveDragVector: vector }),
 
@@ -258,6 +266,8 @@ export const useDimensionsStore = create<DimensionsState>((set) => ({
 
   recordAxisDiscovery: (axis, sign) =>
     set((state) => ({ axisSign: { ...state.axisSign, [axis]: sign } })),
+
+  dismissStageWelcome: () => set({ showStageWelcome: false }),
 
   reset: () => set({ ...initialState }),
 }))

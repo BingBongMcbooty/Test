@@ -152,29 +152,24 @@ export function ArrowDrag() {
       useDimensionsStore.getState().recordAttempt(result)
 
       if (result.success) {
-        // Post-Task-25: which sign (+y/-y, +z/-z) this particular passing drag actually
-        // demonstrated — recorded on *every* pass, not just the first, since Task 18
-        // lets the player keep passing/failing after their first pass and whichever
-        // direction they most recently demonstrated is the one the growth transition
-        // should honor when they eventually hit Continue. Stage 3 never reaches this
-        // (structurally can't pass — see below) so there's no third axis to record.
+        // Post-Task-25: which sign (+y/-y, +z/-z) this passing drag actually
+        // demonstrated — recorded immediately before `advanceStage()` below, so the
+        // growth transition that call is about to start honors this exact drag. Stage 3
+        // never reaches this (structurally can't pass — see stageConfig.ts's
+        // CUBE_ATTEMPTS_BEFORE_REVEAL doc comment) so there's no third axis to record.
         const discovery = discoveredAxisSign(
           { x: dragVector.x, y: dragVector.y, z: dragVector.z },
           STAGE_CONFIG[stage].occupiedAxes,
         )
         if (discovery) useDimensionsStore.getState().recordAxisDiscovery(discovery.axis, discovery.sign)
 
-        // Task 18: Stages 1-2 no longer advance the instant a drag passes — flag it as
-        // passed and let ui/StageContinue.tsx's manual button do the actual advance, so
-        // the player can keep exploring (pass or fail again) in the meantime. Stage 3's
-        // cube never reaches this branch in practice (its occupiedAxes is structurally
-        // all of x/y/z — see stageConfig.ts's CUBE_ATTEMPTS_BEFORE_REVEAL doc comment)
-        // but advances immediately here too, same as before, if it ever did.
-        if (stage === 'line' || stage === 'plane') {
-          useDimensionsStore.getState().markStagePassed()
-        } else {
-          useDimensionsStore.getState().advanceStage()
-        }
+        // A pass advances the stage immediately — Task 18's "linger before advancing"
+        // manual Continue button was cut per direct user feedback: the growth animation
+        // itself (Task 25, since made slower and flashier) is now the beat that gives
+        // the player something to watch, and `ui/DimensionWelcome.tsx`'s fade-in/out
+        // banner is what replaces the Continue button's "you found a way out" moment,
+        // neither of which need the player to click anything to happen.
+        useDimensionsStore.getState().advanceStage()
       } else {
         setFailCue({ start, end })
         failCueTimeoutRef.current = window.setTimeout(() => {

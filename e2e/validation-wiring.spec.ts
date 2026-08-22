@@ -6,6 +6,27 @@ async function canvasSnapshot(page: Page): Promise<Buffer> {
   return page.locator('canvas').screenshot()
 }
 
+// Post-Task-18-removal: a fresh page load starts with `showStageWelcome: true` (see
+// state/store.ts), so `ui/DimensionWelcome.tsx`'s fade-in/hold/fade-out banner is a
+// real, ~2.65s-long animated DOM overlay sitting on top of the canvas right after
+// `page.goto('/')` — since `canvasSnapshot` above is a real compositor screenshot (not
+// `canvas.toDataURL()`), that overlay's own fade genuinely shows up in it, which broke
+// this file's pixel-exact "returns to rest" comparisons the moment two snapshots landed
+// on either side of the banner's fade. Dismissing it up front via the same dev-only
+// `window.__dimensionsStore` escape hatch every other test file already reads state
+// through (never a UI click — the banner has no dismiss button, by design) means these
+// tests keep isolating exactly what they always meant to (drag/fail-cue mechanics), not
+// an unrelated welcome animation.
+async function dismissWelcomeBanner(page: Page) {
+  await page.evaluate(() => {
+    ;(
+      window as unknown as { __dimensionsStore: { getState: () => { dismissStageWelcome: () => void } } }
+    ).__dimensionsStore
+      .getState()
+      .dismissStageWelcome()
+  })
+}
+
 interface CanvasPoint {
   x: number
   y: number
@@ -73,7 +94,7 @@ async function tiltPlaneCamera(page: Page) {
 }
 
 test.describe('validation wiring (Stages 1 & 2)', () => {
-  test('a roughly-orthogonal drag on Stage 1 does not advance immediately — it shows a Continue button and lets the player keep exploring', async ({
+  test('a roughly-orthogonal drag on Stage 1 advances immediately to Stage 2, no Continue click needed', async ({
     page,
   }) => {
     const errors: string[] = []
@@ -82,26 +103,15 @@ test.describe('validation wiring (Stages 1 & 2)', () => {
     await page.goto('/')
     await expect(page.locator('canvas')).toBeVisible()
     await page.waitForTimeout(300)
+    await dismissWelcomeBanner(page)
     await expect(page.getByText('LINE', { exact: true })).toBeVisible()
 
     const center = await canvasCenter(page)
     await dragFrom(page, center, LINE_PASS_DELTA.dx, LINE_PASS_DELTA.dy)
 
-    // Task 18: a pass no longer yanks the player to the next stage — still Stage 1,
-    // with a manual Continue button now showing.
-    await expect(page.getByText('LINE', { exact: true })).toBeVisible()
-    await expect(page.getByTestId('stage-continue-button')).toBeVisible()
-
-    // The player can keep exploring: a failing drag right after the pass stays on
-    // Stage 1 and the Continue button stays put (not un-passed by a later fail).
-    await dragFrom(page, center, LINE_FAIL_DELTA.dx, LINE_FAIL_DELTA.dy)
-    await page.waitForTimeout(100)
-    await expect(page.getByText('LINE', { exact: true })).toBeVisible()
-    await expect(page.getByTestId('stage-continue-button')).toBeVisible()
-    await page.waitForTimeout(700) // let the fail cue finish fading
-
-    // Only the explicit Continue click actually advances the stage.
-    await page.getByTestId('stage-continue-button').click()
+    // Post-Task-18-removal: a pass advances the stage right away, straight into the
+    // growth transition — no manual Continue button, no lingering on Stage 1. See
+    // growth-transition.spec.ts for dedicated coverage of that animation itself.
     await expect(page.getByText('PLANE', { exact: true })).toBeVisible()
 
     // The camera transition is animated (drei's `setLookAt(..., true)`), not an
@@ -113,8 +123,9 @@ test.describe('validation wiring (Stages 1 & 2)', () => {
     const midTransition2 = await canvasSnapshot(page)
     expect(midTransition2).not.toEqual(midTransition1)
 
-    // Let it settle, then confirm the final framing looks right by eye.
-    await page.waitForTimeout(600)
+    // Let the growth animation (GROWTH_DURATION, 2.5s) and camera both settle, then
+    // confirm the final framing looks right by eye.
+    await page.waitForTimeout(3000)
     await page.screenshot({ path: 'e2e/screenshots/validation-stage1-pass-to-plane.png' })
 
     expect(errors).toEqual([])
@@ -129,6 +140,7 @@ test.describe('validation wiring (Stages 1 & 2)', () => {
     await page.goto('/')
     await expect(page.locator('canvas')).toBeVisible()
     await page.waitForTimeout(300)
+    await dismissWelcomeBanner(page)
 
     // Task 24: park the pointer at a fixed, known point before capturing `atRest` — see
     // `canvasCorner`'s doc comment above.
@@ -167,7 +179,7 @@ test.describe('validation wiring (Stages 1 & 2)', () => {
     expect(errors).toEqual([])
   })
 
-  test('a roughly-orthogonal drag on Stage 2 shows a Continue button; the explicit continue advances to Stage 3 (cube)', async ({
+  test('a roughly-orthogonal drag on Stage 2 advances immediately to Stage 3 (cube), no Continue click needed', async ({
     page,
   }) => {
     const errors: string[] = []
@@ -185,13 +197,10 @@ test.describe('validation wiring (Stages 1 & 2)', () => {
     const center = await canvasCenter(page)
     await dragFrom(page, center, PLANE_PASS_DELTA.dx, PLANE_PASS_DELTA.dy)
 
-    // Task 18: still Stage 2 right after the pass — Continue button shows instead.
-    await expect(page.getByText('PLANE', { exact: true })).toBeVisible()
-    await expect(page.getByTestId('stage-continue-button')).toBeVisible()
-
-    await page.getByTestId('stage-continue-button').click()
+    // Post-Task-18-removal: a pass advances immediately, straight into the growth
+    // transition — no Continue button to click.
     await expect(page.getByText('CUBE', { exact: true })).toBeVisible()
-    await page.waitForTimeout(600)
+    await page.waitForTimeout(3000) // let the growth animation (2.5s) settle
     await page.screenshot({ path: 'e2e/screenshots/validation-stage2-pass-to-cube.png' })
 
     expect(errors).toEqual([])

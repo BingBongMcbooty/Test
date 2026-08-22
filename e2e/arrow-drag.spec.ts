@@ -6,6 +6,27 @@ async function canvasSnapshot(page: Page): Promise<Buffer> {
   return page.locator('canvas').screenshot()
 }
 
+// Post-Task-18-removal: a fresh page load starts with `showStageWelcome: true` (see
+// state/store.ts), so `ui/DimensionWelcome.tsx`'s fade-in/hold/fade-out banner is a
+// real, ~2.65s-long animated DOM overlay on top of the canvas right after
+// `page.goto('/')` — since `canvasSnapshot` above is a real compositor screenshot (not
+// `canvas.toDataURL()`), that overlay's own fade genuinely shows up in it, which broke
+// this test's pixel-exact "returns to rest" comparison the moment `atRest` and
+// `afterRelease` landed on either side of the banner's fade. Dismissing it up front via
+// the same dev-only `window.__dimensionsStore` escape hatch every other test file
+// already reads state through (never a UI click — the banner has no dismiss button, by
+// design) keeps this test isolating exactly what it always meant to (drag mechanics,
+// camera restore), not an unrelated welcome animation.
+async function dismissWelcomeBanner(page: Page) {
+  await page.evaluate(() => {
+    ;(
+      window as unknown as { __dimensionsStore: { getState: () => { dismissStageWelcome: () => void } } }
+    ).__dimensionsStore
+      .getState()
+      .dismissStageWelcome()
+  })
+}
+
 interface CanvasPoint {
   x: number
   y: number
@@ -42,6 +63,7 @@ test.describe('pointer/drag controller', () => {
     await page.goto('/')
     await expect(page.locator('canvas')).toBeVisible()
     await page.waitForTimeout(300)
+    await dismissWelcomeBanner(page)
 
     // Task 24: Stage 1 now renders a persistent cursor-projection marker
     // (`CursorMarker.tsx`) wherever `liveCursorPoint` last landed, updated by a plain

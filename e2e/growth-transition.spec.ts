@@ -74,7 +74,7 @@ async function waitForGrowthTransitionCleared(page: Page) {
 }
 
 test.describe('Task 25: dimension-growth transitions', () => {
-  test('Stage 1->2: a real pass + Continue plays a visible growth animation, not an instant swap', async ({
+  test('Stage 1->2: a real pass plays a visible growth animation, not an instant swap', async ({
     page,
   }) => {
     const errors: string[] = []
@@ -84,17 +84,16 @@ test.describe('Task 25: dimension-growth transitions', () => {
     await expect(page.locator('canvas')).toBeVisible()
     await page.waitForTimeout(300)
 
-    const center = await canvasCenter(page)
-    await dragFrom(page, center, LINE_PASS_DELTA.dx, LINE_PASS_DELTA.dy)
-    await expect(page.getByTestId('stage-continue-button')).toBeVisible()
-
     // Still Stage 1's real, fully-formed geometry right before the advance.
     const preAdvance = await canvasSnapshot(page)
 
-    await page.getByTestId('stage-continue-button').click()
+    const center = await canvasCenter(page)
+    await dragFrom(page, center, LINE_PASS_DELTA.dx, LINE_PASS_DELTA.dy)
 
-    // Captured as tightly after the click as possible — see the helper doc comment
-    // above for why every other awaited call in this test happens after this pair.
+    // Post-Task-18-removal: a pass calls advanceStage() immediately, no Continue click
+    // in between — captured as tightly after the drag's pointerup as possible, before
+    // any other awaited call gets a chance to eat into the window (see the helper doc
+    // comment above).
     const rightAfterAdvance = await readGrowthTransition(page)
     expect(rightAfterAdvance).toEqual({ from: 'line', to: 'plane' })
     const mid = await canvasSnapshot(page)
@@ -117,7 +116,7 @@ test.describe('Task 25: dimension-growth transitions', () => {
     expect(errors).toEqual([])
   })
 
-  test('Stage 2->3: a real pass + Continue plays a visible growth animation, not an instant swap', async ({
+  test('Stage 2->3: a real pass plays a visible growth animation, not an instant swap', async ({
     page,
   }) => {
     const errors: string[] = []
@@ -128,14 +127,12 @@ test.describe('Task 25: dimension-growth transitions', () => {
     await page.waitForTimeout(600)
     await tiltPlaneCamera(page)
 
-    const center = await canvasCenter(page)
-    await dragFrom(page, center, PLANE_PASS_DELTA.dx, PLANE_PASS_DELTA.dy)
-    await expect(page.getByTestId('stage-continue-button')).toBeVisible()
-
     const preAdvance = await canvasSnapshot(page)
 
-    await page.getByTestId('stage-continue-button').click()
+    const center = await canvasCenter(page)
+    await dragFrom(page, center, PLANE_PASS_DELTA.dx, PLANE_PASS_DELTA.dy)
 
+    // Post-Task-18-removal: a pass calls advanceStage() immediately, no Continue click.
     const rightAfterAdvance = await readGrowthTransition(page)
     expect(rightAfterAdvance).toEqual({ from: 'plane', to: 'cube' })
     const mid = await canvasSnapshot(page)

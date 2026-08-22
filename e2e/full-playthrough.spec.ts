@@ -91,13 +91,10 @@ test.describe('Task 26: full playthrough regression', () => {
     await expect(page.getByText('LINE', { exact: true })).toBeVisible()
     await page.screenshot({ path: 'e2e/screenshots/full-playthrough-01-line.png' })
 
-    // --- Stage 1: pass, keep exploring is implicit (Continue shows, not forced),
-    // then the real advance plays Task 25's growth animation into Stage 2. ---
+    // --- Stage 1: post-Task-18-removal, a pass advances immediately — straight into
+    // Task 25's growth animation into Stage 2, no Continue click. ---
     let center = await canvasCenter(page)
     await dragFrom(page, center, LINE_PASS_DELTA.dx, LINE_PASS_DELTA.dy)
-    await expect(page.getByTestId('stage-continue-button')).toBeVisible()
-
-    await page.getByTestId('stage-continue-button').click()
     expect((await readStoreState(page)).growthTransition).toEqual({ from: 'line', to: 'plane' })
     await waitForGrowthTransitionCleared(page)
     await expect(page.getByText('PLANE', { exact: true })).toBeVisible()
@@ -105,14 +102,11 @@ test.describe('Task 26: full playthrough regression', () => {
     await page.screenshot({ path: 'e2e/screenshots/full-playthrough-02-plane.png' })
 
     // --- Stage 2: dead-on rest means z is unreachable until the camera is tilted via
-    // the on-screen button (Task 17); then pass, continue, and the plane->cube growth
-    // animation plays. ---
+    // the on-screen button (Task 17); then a pass advances immediately into the
+    // plane->cube growth animation, same as Stage 1 above. ---
     await tiltPlaneCamera(page)
     center = await canvasCenter(page)
     await dragFrom(page, center, PLANE_PASS_DELTA.dx, PLANE_PASS_DELTA.dy)
-    await expect(page.getByTestId('stage-continue-button')).toBeVisible()
-
-    await page.getByTestId('stage-continue-button').click()
     expect((await readStoreState(page)).growthTransition).toEqual({ from: 'plane', to: 'cube' })
     await waitForGrowthTransitionCleared(page)
     await expect(page.getByText('CUBE', { exact: true })).toBeVisible()

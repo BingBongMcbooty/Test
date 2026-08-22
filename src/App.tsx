@@ -6,10 +6,10 @@ import { ClosingContinue } from './ui/ClosingContinue'
 import { CubeFeedback } from './ui/CubeFeedback'
 import { DebugStageControls } from './ui/DebugStageControls'
 import { DimensionPanel } from './ui/DimensionPanel'
+import { DimensionWelcome } from './ui/DimensionWelcome'
 import { HUD } from './ui/HUD'
 import { RevealControls } from './ui/RevealControls'
 import { SliceWarmupControls } from './ui/SliceWarmupControls'
-import { StageContinue } from './ui/StageContinue'
 
 function App() {
   return (
@@ -18,7 +18,7 @@ function App() {
       <HUD />
       <DimensionPanel />
       <CubeFeedback />
-      <StageContinue />
+      <DimensionWelcome />
       <RevealControls />
       <ChiralityPrototypeBadge />
       <SliceWarmupControls />

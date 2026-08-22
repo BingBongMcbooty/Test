@@ -2,8 +2,8 @@ import { useDimensionsStore } from '../state/store'
 
 /**
  * Task 22: lets the player leave Stage 4 whenever they're ready. Reveal has no
- * pass/fail condition to gate on (unlike Stages 1-3's `stagePassed`/`CubeFeedback`
- * thresholds) — it's pure exploration across three views (slice/projection/chirality),
+ * pass/fail condition to gate on (unlike Stage 3's `CubeFeedback` attempt threshold) —
+ * it's pure exploration across three views (slice/projection/chirality),
  * so per PLAN.md's "on a continue click" option, this is a plain manual button, always
  * available once the warm-up is done, same "no artificial lock" precedent as
  * `SliceWarmupControls`'s skip button right before it in the flow.
