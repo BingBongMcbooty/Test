@@ -19,3 +19,22 @@ body {
   overflow: hidden;
   font-family: system-ui, 'Segoe UI', Roboto, sans-serif;
 }
+
+/* Task 27: the small stage-label fade/rise in `ui/HUD.tsx` — kept here as a global rule
+   (rather than an inline <style> tag re-rendered on every HUD update, which HUD renders
+   on nearly every pointer move on Stages 1-2) so it's declared once. `key={stage}` on the
+   label element is what actually restarts the animation on each stage change; a plain CSS
+   transition can't do that on its own since remounting resets to the animation's `from`
+   state on paint, the same trick `ui/ClosingBeat.tsx`/`ui/DimensionWelcome.tsx` already
+   use for their own remount-driven fades, just via CSS keyframes instead of a JS-toggled
+   opacity transition since this one has no hold/dismiss lifecycle to track. */
+@keyframes hud-label-rise {
+  from {
+    opacity: 0;
+    transform: translateY(-0.25rem);
+  }
+  to {
+    opacity: 0.6;
+    transform: translateY(0);
+  }
+}

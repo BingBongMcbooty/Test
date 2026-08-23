@@ -35,20 +35,44 @@ const panelContainerStyle = {
   // overlap the centered header prompt (`ui/HUD.tsx`) at typical viewport widths.
   // Every row already wraps by default (plain `div`s, no `whiteSpace: 'nowrap'`
   // anywhere in this file) — a `maxWidth` alone is enough to force that wrapping
-  // instead of letting content dictate the box's width.
+  // instead of letting content dictate the box's width. Kept at exactly `14rem` —
+  // `e2e/instrumentation-panel.spec.ts` asserts the rendered box stays under that
+  // (plus rounding slack) as its regression check for this fix, so Task 27's own
+  // padding/typography polish below stays inside this box rather than widening it
+  // (`box-sizing: border-box`, set globally in `index.css`, is what makes padding
+  // safe to grow without growing past `maxWidth`).
   maxWidth: '14rem',
-  padding: '0.75rem 1rem',
+  padding: '0.85rem 1.1rem 1rem',
   display: 'flex',
   flexDirection: 'column',
-  gap: '0.5rem',
+  gap: '0.55rem',
   fontFamily: 'ui-monospace, "SF Mono", Menlo, monospace',
   fontSize: '0.72rem',
   letterSpacing: '0.02em',
   color: '#e5e4e7',
-  background: 'rgba(10, 10, 15, 0.55)',
-  border: '1px solid rgba(229, 228, 231, 0.25)',
-  borderRadius: '0.5rem',
+  background: 'rgba(12, 12, 18, 0.6)',
+  border: '1px solid rgba(229, 228, 231, 0.22)',
+  borderRadius: '0.65rem',
+  boxShadow: '0 0.6rem 1.75rem rgba(0, 0, 0, 0.35)',
+  backdropFilter: 'blur(10px)',
+  WebkitBackdropFilter: 'blur(10px)',
   pointerEvents: 'none',
+} as const
+
+/**
+ * Task 27: a small uppercase label at the top of the panel, purely typographic — this
+ * app never explained what the corner readout *was* before this, it just started
+ * printing rows. A one-line header costs nothing structurally (no testid, nothing reads
+ * its text) and gives the panel the same "labeled instrument" framing `ui/HUD.tsx`'s own
+ * small stage label already gives the header.
+ */
+const panelHeaderStyle = {
+  fontSize: '0.62rem',
+  fontWeight: 600,
+  letterSpacing: '0.22em',
+  opacity: 0.5,
+  paddingBottom: '0.15rem',
+  borderBottom: '1px solid rgba(229, 228, 231, 0.18)',
 } as const
 
 /**
@@ -74,11 +98,22 @@ function PanelRow({
   color?: string
   dim?: boolean
 }) {
-  const style: CSSProperties = { opacity: dim ? 0.5 : 1, color }
+  const style: CSSProperties = { opacity: dim ? 0.5 : 1, color, lineHeight: 1.3 }
   return (
     <div data-testid={testId} style={style}>
-      <div>{primary}</div>
-      <div style={{ fontSize: '0.6rem', opacity: 0.6, marginTop: '0.1rem' }}>[{notation}]</div>
+      <div style={{ fontFamily: 'system-ui, "Segoe UI", Roboto, sans-serif', fontWeight: 400 }}>
+        {primary}
+      </div>
+      <div
+        style={{
+          fontSize: '0.6rem',
+          opacity: 0.55,
+          marginTop: '0.15rem',
+          letterSpacing: '0.03em',
+        }}
+      >
+        [{notation}]
+      </div>
     </div>
   )
 }
@@ -184,6 +219,7 @@ function RevealDimensionPanel() {
 
   return (
     <div data-testid="dimension-panel" style={panelContainerStyle}>
+      <div style={panelHeaderStyle}>readout</div>
       <div data-testid="dimension-row-rotation-xw">xw: {formatDegrees(revealRotationXW)}</div>
       <div data-testid="dimension-row-rotation-yw">yw: {formatDegrees(revealRotationYW)}</div>
       <div data-testid="dimension-row-slice-w0">w0: {formatNumber(revealSliceW0)}</div>
@@ -296,6 +332,7 @@ export function DimensionPanel() {
 
   return (
     <div data-testid="dimension-panel" style={panelContainerStyle}>
+      <div style={panelHeaderStyle}>readout</div>
       {AXES.map((axis) => {
         if (!occupiedAxes.includes(axis)) {
           return (

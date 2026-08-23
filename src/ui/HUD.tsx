@@ -14,7 +14,12 @@ export function HUD() {
   const { prompt } = STAGE_CONFIG[stage]
   // Task 22: 'closing' gets a deliberate fade-in for its line instead of this HUD's
   // usual instant-cut prompt — `ui/ClosingBeat.tsx` owns rendering it (same text, from
-  // the same `STAGE_CONFIG` entry) so it isn't shown twice.
+  // the same `STAGE_CONFIG` entry) so it isn't shown twice. Task 27 considered widening
+  // this instant-cut into a fade for every stage's prompt, and deliberately didn't:
+  // the prompt is the one line this app has always cut instantly (see this comment's own
+  // history), and `ui/StageTransitionFade.tsx` now covers the two boundaries (3→Reveal,
+  // Reveal→Closing) that most needed *some* transition device without touching this
+  // established feel. Only the small label above it gets the new subtle fade below.
   const showPrompt = stage !== 'closing'
 
   return (
@@ -31,7 +36,16 @@ export function HUD() {
         textAlign: 'center',
       }}
     >
-      <div style={{ fontSize: '0.8rem', letterSpacing: '0.2em', opacity: 0.6 }}>
+      <div
+        key={stage}
+        style={{
+          fontSize: '0.78rem',
+          fontWeight: 500,
+          letterSpacing: '0.28em',
+          opacity: 0.6,
+          animation: 'hud-label-rise 420ms ease-out both',
+        }}
+      >
         {STAGE_LABELS[stage].toUpperCase()}
       </div>
       {showPrompt && (
@@ -47,9 +61,10 @@ export function HUD() {
             // *header's* width instead, so a long prompt wraps narrower and stays
             // clear of the panel's corner regardless of which stage's copy is showing.
             maxWidth: '40rem',
-            margin: '0.5rem auto 0',
-            fontSize: '1.1rem',
+            margin: '0.6rem auto 0',
+            fontSize: '1.15rem',
             fontWeight: 300,
+            lineHeight: 1.5,
           }}
         >
           {prompt}
