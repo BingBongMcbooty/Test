@@ -1,6 +1,6 @@
 # Progress
 
-**Next up:** Task 28 — Deploy *(optional)*
+**Next up:** none — all planned tasks (1–28) are complete.
 
 Status legend: ⬜ not started · 🔶 in progress · ✅ done
 
@@ -53,7 +53,7 @@ Status legend: ⬜ not started · 🔶 in progress · ✅ done
 ## Regression & polish *(new session)*
 - ✅ Task 26 — Full-playthrough regression test — `worktree-agent-ac13b5eff8bff854c` @ `249c154`, **pushed straight to `claude/dimensional-exploration-app-uj20jy` (the default branch) on `origin`** — clean fast-forward, `9cc45e5..249c154`, confirmed via `git ls-remote`
 - ✅ Task 27 — Visual/tone polish *(optional)* — `claude/task-27-visual-polish` @ `c8cce54`, merged to `claude/dimensional-exploration-app-uj20jy` (the default branch) via a clean local fast-forward and **pushed straight to `origin`** (see this task's own merge note below the checklist for the exact range)
-- ⬜ Task 28 — Deploy *(optional)*
+- ✅ Task 28 — Deploy *(optional)* — `claude/task-28-initiation-hl3e47` @ `66fbee4`, merged to default
 
 ## Notes / deviations from PLAN.md
 
@@ -329,3 +329,12 @@ A session (`claude/remaining-tasks-0bhdm7`) was asked to run the two remaining o
 - The orchestrating session retried with exponential-then-hourly backoff (3 quick retries, then 10min/25min/45min/hourly) rather than hammering the endpoint. It failed **11 consecutive times over ~7 hours** (00:36–07:49 UTC on 2026-08-23) before the human owner (Henry) woke up, saw the outage was ongoing, cancelled the pending retry, and said he'd spawn the Task 28 session manually.
 - **Lesson for a future session that hits the same error:** `create_session` failing with "temporarily unavailable" is a platform-level outage on that specific call, not something fixable by changing the request — don't waste time debugging params, environment IDs, or permissions. Back off and retry (a human stepping in and just trying again later is a completely reasonable fix — it isn't necessarily still down by the time you read this). If it's still down after a few tries, say so plainly rather than silently retrying forever — the owner needs to know Task 28 hasn't actually started.
 - **State at handoff:** Task 27 fully merged to default (`ec8030e`), verified. Task 28 not started — no `claude/task-28-deploy` branch existed on `origin` at handoff time. Re-audited the whole tree from a clean `origin/claude/dimensional-exploration-app-uj20jy` worktree afterward (fresh `npm install`, `npm run lint`, `npx tsc --noEmit`, `npm test` — 176/176, `npm run build`, full Playwright run — 42/43, the one failure being the exact already-documented `full-playthrough.spec.ts` Stage-4 CPU-contention flake from Task 27's own notes above, not a new regression) plus a manual screenshot review (line/cube/reveal stages) to confirm nothing was left in a broken state by the aborted orchestration attempt — everything checked out clean.
+
+## Task 28 — Deploy
+
+- **Platform choice — asked rather than guessed:** PLAN.md left Vercel/Netlify/GitHub Pages open. Asked Henry directly (`AskUserQuestion`); he picked **GitHub Pages**, which was also the only option this session could actually stand up end-to-end — Vercel/Netlify both need an external account + API token this sandbox has no access to, whereas GitHub Pages only needs the `origin` push access this session already has.
+- **Mechanism:** `.github/workflows/deploy.yml` — a two-job Actions workflow (`build` then `deploy`) using `actions/upload-pages-artifact` + `actions/deploy-pages`, triggered on push to `claude/dimensional-exploration-app-uj20jy` (the actual default branch — confirmed via `git remote show origin`'s `HEAD branch`, not assumed from a name) plus `workflow_dispatch` for a manual re-run. `npm ci && npm run build` with `GITHUB_PAGES=true` in the build step's env.
+- **Base-path handling:** `vite.config.ts`'s `base` is `'/Test/'` only when the `GITHUB_PAGES` env var is set, `'/'` otherwise — GitHub Pages project sites (as opposed to a `<user>.github.io` root site) serve from `https://bingbongmcbooty.github.io/Test/`, not the domain root, so asset URLs need the `/Test/` prefix in that one context but nowhere else (local `npm run dev`/`npm run build`/`npm run preview` all stay at `/` exactly as before). Verified both paths by building with and without the env var and diffing `dist/index.html`'s emitted asset URLs (`/assets/...` vs `/Test/assets/...`).
+- **Repo-side setting still needed, outside this session's reach:** the workflow publishes via the `actions/deploy-pages` action, which requires the repo's Settings → Pages → Source to be set to "GitHub Actions" (a one-time manual toggle in the GitHub UI) before the first run can actually publish anything — this session has no UI/API access to flip that setting itself. The workflow will run and build correctly regardless, but the `deploy` job will fail until that toggle is set. **Someone with repo admin access needs to do this once** before the deployed URL goes live.
+- **Verified:** `npm run build && npm run preview` served the production build on `localhost:4173` — confirmed via a Playwright script (console-error-free load, correct `<title>`, and a manual screenshot review) that it matches dev behavior (Stage 1's line, instrumentation panel, camera D-pad all render identically to prior tasks' screenshots). `npm test` still 176/176 after the `vite.config.ts` change (test config untouched). Did **not** attempt to verify the actual deployed `https://bingbongmcbooty.github.io/Test/` URL loads — that depends on the Pages-source toggle above being set and the workflow running on GitHub's infrastructure, neither of which this session can trigger or observe from here.
+- **Merge:** `claude/task-28-initiation-hl3e47` @ `66fbee4` merged into `claude/dimensional-exploration-app-uj20jy` (the default branch) via a clean local fast-forward and pushed straight to `origin`.
